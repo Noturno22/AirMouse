@@ -52,9 +52,17 @@ class Config:
 
     scroll_gain_factor: float = 0.06
     scroll_deadzone_px: float = 2.0
-    volume_deadzone_px: float = 3.0
-    volume_deadzone_px: float = 14.0
-    volume_px_per_key: float = 22.0
+    volume_deadzone_px: float = 6.0
+    volume_px_per_key: float = 16.0
+
+    brightness_step: int = 10
+    fist_cycle_count: int = 2
+    fist_cycle_window_s: float = 2.5
+    wave_min_reversals: int = 3
+    wave_window_s: float = 1.5
+    wave_min_amplitude_px: float = 15.0
+    multi_clap_count: int = 3
+    multi_clap_window_s: float = 2.5
 
     click_freeze_ms: int = 60
     gesture_stable_frames: int = 3

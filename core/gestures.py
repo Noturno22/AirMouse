@@ -223,7 +223,7 @@ class GestureEngine:
             vol_y = (pts[8][1] + pts[12][1] + pts[16][1]) / 3.0
             if self._vol_prev_y is not None:
                 dy = vol_y - self._vol_prev_y
-                self._vol_acc_y += dy
+                self._vol_acc_y -= dy
                 if abs(self._vol_acc_y) >= cfg.volume_deadzone_px:
                     event, value = "volume", self._vol_acc_y
                     self._vol_acc_y = 0.0

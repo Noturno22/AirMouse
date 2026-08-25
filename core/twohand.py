@@ -2,7 +2,7 @@ import math
 import subprocess
 import time
 
-from core.gestures import Gesture
+from core.gestures import Gesture, GestureEngine
 
 CREATE_NO_WINDOW = 0x08000000
 
@@ -206,3 +206,202 @@ class HandPool:
             if label not in seen:
                 self.engines[label].reset()
         return results
+
+
+class BrightnessCtl:
+    """Controla luminosidade do ecra via gamma ramp (Windows).
+
+    Cada chamada a decrease/increase ajusta o brilho por um passo
+    percentual. Usa a API SetDeviceGammaRamp do gdi32 para resposta
+    instantanea.
+    """
+
+    def __init__(self, step=10, initial=70):
+        self.step = step
+        self.level = initial
+        try:
+            import ctypes
+            self._gdi32 = ctypes.windll.gdi32
+            self._user32 = ctypes.windll.user32
+            self._available = True
+        except Exception:
+            self._available = False
+
+    def decrease(self):
+        self.level = max(5, self.level - self.step)
+        self._apply(self.level)
+        return f"LUMINOSIDADE {self.level}%"
+
+    def increase(self):
+        self.level = min(100, self.level + self.step)
+        self._apply(self.level)
+        return f"LUMINOSIDADE {self.level}%"
+
+    def _apply(self, level):
+        if not self._available:
+            return
+        g = max(0.0, min(level / 100.0, 1.0))
+        try:
+            hdc = self._user32.GetDC(None)
+            if not hdc:
+                return
+            ramp = (__import__("ctypes").c_ushort * 768)()
+            for i in range(256):
+                v = min(int(i * g * 257), 65535)
+                ramp[i] = v
+                ramp[256 + i] = v
+                ramp[512 + i] = v
+            self._gdi32.SetDeviceGammaRamp(hdc, __import__("ctypes").byref(ramp))
+            self._user32.ReleaseDC(None, hdc)
+        except Exception:
+            pass
+
+
+class FistCycleDetector:
+    """Deteta ciclos de fechar/abrir punho para atalhos (ex: Ctrl+D).
+
+    Conta transicoes FIST->OPEN dentro de uma janela temporal.
+    Apos N ciclos completos, dispara a accao e reinicia.
+    """
+
+    def __init__(self, cycles_needed=2, window_s=2.5, cooldown_s=2.0):
+        self.cycles_needed = cycles_needed
+        self.window_s = window_s
+        self.cooldown_s = cooldown_s
+        self._in_fist = False
+        self._cycle_count = 0
+        self._first_t = None
+        self._until = 0.0
+
+    def update(self, gesture, now):
+        if now < self._until:
+            return False
+        if gesture == Gesture.FIST:
+            self._in_fist = True
+        elif gesture == Gesture.OPEN:
+            if self._in_fist:
+                self._in_fist = False
+                if self._first_t is None:
+                    self._first_t = now
+                self._cycle_count += 1
+                if now - self._first_t > self.window_s:
+                    self._cycle_count = 1
+                    self._first_t = now
+                elif self._cycle_count >= self.cycles_needed:
+                    self._cycle_count = 0
+                    self._first_t = None
+                    self._until = now + self.cooldown_s
+                    return True
+        else:
+            self._in_fist = False
+        return False
+
+
+class WaveDetector:
+    """Deteta gesto de "bye bye" (onda lateral) para atalhos (ex: Ctrl+E).
+
+    Rastreia a posicao X da palma e conta inversoes de direcao.
+    Apos M inversoes na janela temporal, dispara a accao.
+    """
+
+    def __init__(self, min_reversals=3, window_s=1.5,
+                 min_amplitude_px=15.0, cooldown_s=2.0):
+        self.min_reversals = min_reversals
+        self.window_s = window_s
+        self.min_amplitude_px = min_amplitude_px
+        self.cooldown_s = cooldown_s
+        self._points = []
+        self._until = 0.0
+
+    def update(self, palm_x, now):
+        if now < self._until:
+            return False
+        self._points.append((palm_x, now))
+        while self._points and now - self._points[0][1] > self.window_s:
+            self._points.pop(0)
+        if len(self._points) < 4:
+            return False
+        reversals = 0
+        last_dir = 0
+        prev_x = self._points[0][0]
+        for i in range(1, len(self._points)):
+            dx = self._points[i][0] - prev_x
+            if abs(dx) < self.min_amplitude_px:
+                continue
+            cur_dir = 1 if dx > 0 else -1
+            if last_dir != 0 and cur_dir != last_dir:
+                reversals += 1
+            last_dir = cur_dir
+            prev_x = self._points[i][0]
+        if reversals >= self.min_reversals:
+            self._points.clear()
+            self._until = now + self.cooldown_s
+            return True
+        return False
+
+
+class MultiClapDetector:
+    """Deteta N palmas rapidas para atalhos (ex: Alt+Tab).
+
+    Funciona independentemente do ClapDetector de palma unica.
+    Conta palmas dentro de uma janela temporal e dispara apos N.
+    """
+
+    def __init__(self, claps_needed=3, window_s=2.5, cooldown_s=2.5,
+                 sep_factor=3.0, close_factor=1.35, speed_factor=2.0):
+        self.claps_needed = claps_needed
+        self.window_s = window_s
+        self.cooldown_s = cooldown_s
+        self.sep_factor = sep_factor
+        self.close_factor = close_factor
+        self.speed_factor = speed_factor
+        self._prev_d = None
+        self._prev_t = None
+        self._separated = False
+        self._fired_current = False
+        self._count = 0
+        self._window_start = None
+        self._until = 0.0
+
+    def update(self, palms, scales, now):
+        if now < self._until:
+            return False
+        if len(palms) != 2 or len(scales) != 2:
+            self._prev_d = None
+            self._prev_t = None
+            self._separated = False
+            self._fired_current = False
+            return False
+        ms = (max(scales[0], 1e-3) + max(scales[1], 1e-3)) / 2.0
+        d = math.hypot(palms[0][0] - palms[1][0], palms[0][1] - palms[1][1])
+        v = 0.0
+        if self._prev_d is not None and self._prev_t is not None:
+            dt = max(now - self._prev_t, 1e-3)
+            v = (self._prev_d - d) / dt
+        self._prev_d = d
+        self._prev_t = now
+        if d > self.sep_factor * ms:
+            self._separated = True
+            self._fired_current = False
+        closing = v > self.speed_factor * ms
+        near = d < self.close_factor * ms
+        if closing and near and self._separated and not self._fired_current:
+            self._fired_current = True
+            if (self._window_start is None
+                    or now - self._window_start > self.window_s):
+                self._count = 1
+                self._window_start = now
+            else:
+                self._count += 1
+            if self._count >= self.claps_needed:
+                self._count = 0
+                self._window_start = None
+                self._until = now + self.cooldown_s
+                return True
+        if not closing or not near:
+            self._fired_current = False
+        if (self._window_start is not None
+                and now - self._window_start > self.window_s):
+            self._count = 0
+            self._window_start = None
+        return False

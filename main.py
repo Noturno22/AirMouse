@@ -25,7 +25,10 @@ from core.nlu import ACTION_LABELS
 from core.snap import SnapEngine
 from core.tracker import HAND_CONNECTIONS, HandTracker, ensure_model
 from core.tray import TrayAppAdapter, TrayIcon
-from core.twohand import ClapDetector, HandPool, MagnifierCtl
+from core.twohand import (
+    BrightnessCtl, ClapDetector, FistCycleDetector, HandPool,
+    MagnifierCtl, MultiClapDetector, WaveDetector,
+)
 from core.tts import Speaker
 from core.voice import VoiceEngine
 
@@ -273,15 +276,17 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
             "punho ......... arrastar",
             "pinca medio ... clique direito",
             "dois dedos .... scroll",
-            "tres dedos .... volume | polegar cima = play/pausa",
-            "3 dedos ....... volume (mao cima/baixo)",
+            "tres dedos + cima/baixo = volume",
             "polegar cima .. play/pausa multimédia",
-            "PALMAS ........ abrir/fechar assistente 3D",
+            "punho esq (2 maos) = diminuir brilho",
+            "punho dir (2 maos) = aumentar brilho",
+            "fechar/abrir punho x2 = Ctrl+D",
+            "bye bye ........ Ctrl+E",
+            "PALMAS (x3) ... Alt+Tab",
             "2 maos abertas + afastar = lupa (zoom)",
             "[ / ] ......... ganho -/+",
             ", / . ......... suavidade",
             "m ............. snap magnetico ON/OFF",
-            "b ............. assistente 3D",
             "a ............. auto-afinacao | v voz | s gravar",
             "espaco ........ pausar | Q sair",
             "voz: jarvis <comando natural>",
@@ -299,7 +304,7 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
     return frame
 
 
-VOLUME_STEP_PX = 12.0
+VOLUME_STEP_PX = 8.0
 _kb_ctl = None
 
 
@@ -313,6 +318,27 @@ def _media_tap(key, times=1):
         for _ in range(max(1, min(times, 8))):
             _kb_ctl.press(key)
             _kb_ctl.release(key)
+    except Exception:
+        pass
+
+
+def _keyboard_shortcut(combo):
+    global _kb_ctl
+    try:
+        if _kb_ctl is None:
+            from pynput.keyboard import Controller as _KC
+            _kb_ctl = _KC()
+        from pynput.keyboard import Key
+        key_map = {
+            "ctrl": Key.ctrl_l, "alt": Key.alt_l, "shift": Key.shift_l,
+            "cmd": Key.cmd, "tab": Key.tab, "win": Key.cmd,
+        }
+        parts = combo.lower().split("+")
+        keys = [key_map.get(p.strip(), p.strip()) for p in parts]
+        for k in keys:
+            _kb_ctl.press(k)
+        for k in reversed(keys):
+            _kb_ctl.release(k)
     except Exception:
         pass
 
@@ -471,6 +497,17 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
 
     clap = ClapDetector() if cfg.clap_enabled else None
     magnifier = ctx.magnifier
+    brightness = BrightnessCtl(step=cfg.brightness_step)
+    fist_cycle = FistCycleDetector(
+        cycles_needed=cfg.fist_cycle_count, window_s=cfg.fist_cycle_window_s,
+    )
+    wave = WaveDetector(
+        min_reversals=cfg.wave_min_reversals, window_s=cfg.wave_window_s,
+        min_amplitude_px=cfg.wave_min_amplitude_px,
+    )
+    multi_clap = MultiClapDetector(
+        claps_needed=cfg.multi_clap_count, window_s=cfg.multi_clap_window_s,
+    )
     light = LightBoost() if cfg.low_light_boost else None
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
@@ -517,6 +554,8 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
     dt_ema = 0.05
     exposure_tried = False
     gray_check = 0
+    left_fist_prev = False
+    right_fist_prev = False
 
     def toast(text):
         ui["toast"] = text
@@ -606,6 +645,29 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                     toast(note)
                     if ctx.speaker:
                         ctx.speaker.say(note)
+
+            if len(results) == 2 and not state["paused"]:
+                palms2 = [r[0].palm_center for r in results.values()]
+                scales2 = [r[0].hand_scale_px for r in results.values()]
+                if multi_clap.update(palms2, scales2, now):
+                    _keyboard_shortcut("alt+tab")
+                    toast("ALT+TAB")
+
+            left_fist = False
+            right_fist = False
+            if len(results) == 2:
+                if "Left" in results:
+                    left_fist = results["Left"][0].gesture == Gesture.FIST
+                if "Right" in results:
+                    right_fist = results["Right"][0].gesture == Gesture.FIST
+            if left_fist and not left_fist_prev:
+                note = brightness.decrease()
+                toast(note)
+            if right_fist and not right_fist_prev:
+                note = brightness.increase()
+                toast(note)
+            left_fist_prev = left_fist
+            right_fist_prev = right_fist
 
             mag_note = None
             if magnifier is not None and len(results) == 2:
@@ -729,6 +791,17 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                 last_scroll = ev_value
             elif hand_frame is None or hand_frame.gesture != Gesture.PEACE:
                 last_scroll = None
+
+            if (hand_frame is not None
+                    and hand_frame.gesture not in (Gesture.NONE, Gesture.PEACE, Gesture.THREE)
+                    and not state["paused"]):
+                if fist_cycle.update(hand_frame.gesture, now):
+                    _keyboard_shortcut("ctrl+d")
+                    toast("CTRL+D")
+                if hand_frame.gesture == Gesture.OPEN:
+                    if wave.update(hand_frame.palm_center[0], now):
+                        _keyboard_shortcut("ctrl+e")
+                        toast("CTRL+E")
 
             tune_note = tuner.maybe_apply(time.monotonic(), filters, cfg)
             if tune_note:
@@ -990,17 +1063,17 @@ def main():
     smooth_label = SMOOTH_PRESETS[smooth_idx][0] if smooth_idx >= 0 else "CUSTOM"
     print(f"Ecra: {mouse.screen_w}x{mouse.screen_h} | ganho: {cfg.move_gain:.1f} | suavidade: {smooth_label}")
     print(
-        "Gestos: mao aberta=mover | pinca index=clique esquerdo/arrastar |"
-        " punho=arrastar | pinca medio=clique direito | dois dedos=scroll |"
-        " 3 dedos=volume | polegar cima=play/pausa"
+        "Gestos: mao aberta=mover | pinca index=clique/arrastar |"
+        " punho=arrastar | pinca medio=clique dir | dois dedos=scroll |"
+        " 3 dedos=cima/baixo=volume | polegar=play/pausa"
     )
     print(
-        "Novo: palmas=assistente 3D | 2 maos abertas+lupa | snap magnetico (tecla M)"
-        " | predicao de movimento ON"
+        "Novo: punho esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
+        " bye bye=Ctrl+E | 3 palmas=Alt+Tab | lupa | snap"
     )
     print(
-        "Teclas: [ ] ganho | , . suavidade | a auto-afinacao | v voz | m snap |"
-        " b assistente | s gravar | h ajuda | espaco pausa | Q sair"
+        "Teclas: [ ] ganho | , . suavidade | a auto-afinacao | v voz |"
+        " s gravar | h ajuda | espaco pausa | Q sair"
     )
 
     exit_code = 0
