@@ -140,6 +140,7 @@ class MagnifierCtl:
                 self.on = False
                 self._streak = 0
                 self._bad_since = None
+                _magnifier_exit(self.kb)
                 self.last_action = "LUPA OFF"
                 return self.last_action
             return None

@@ -11,12 +11,16 @@ THUMB_TIP, INDEX_TIP, MIDDLE_TIP = 4, 8, 12
 class Gesture(Enum):
     NONE = "sem mao"
     OPEN = "mover"
+    ONE = "mover (1 dedo)"
     PINCH = "clique esquerdo"
     PINCH_MID = "clique direito"
     FIST = "arrastar"
     PEACE = "scroll"
     THREE = "volume"
     THUMB_UP = "play/pausa"
+    FOUR = "minimizar"
+    PINKY = "copiar"
+    SHAKA = "colar"
 
 
 @dataclass
@@ -122,6 +126,42 @@ class GestureEngine:
             and not curled[RING]
             and _clearly_curled(PINKY)
         )
+        one_finger = (
+            not curled[INDEX]
+            and curled[MIDDLE]
+            and curled[RING]
+            and curled[PINKY]
+            and not self._pinch_index_on
+        )
+        pinky_only = (
+            curled[INDEX]
+            and curled[MIDDLE]
+            and curled[RING]
+            and not curled[PINKY]
+        )
+        # SHAKA: thumb extended (not curled toward wrist) + pinky extended
+        thumb_out = False
+        if all_curled or pinky_only:
+            tip_y = pts[THUMB_TIP][1]
+            ip_y = pts[3][1]
+            dx_thumb = abs(pts[THUMB_TIP][0] - pts[3][0])
+            dy_thumb = abs(tip_y - ip_y)
+            thumb_out = dx_thumb > 0.3 * scale or dy_thumb > 0.25 * scale
+        thumb_pinky = (
+            thumb_out
+            and not curled[PINKY]
+            and curled[INDEX]
+            and curled[MIDDLE]
+            and curled[RING]
+        )
+        four_fingers = (
+            not curled[INDEX]
+            and not curled[MIDDLE]
+            and not curled[RING]
+            and not curled[PINKY]
+            and not self._pinch_index_on
+            and not self._pinch_mid_on
+        )
         thumb_up = False
         if all_curled:
             # polegar apontando claramente para cima, acima de todos os MCPs
@@ -149,6 +189,14 @@ class GestureEngine:
             geo = Gesture.THREE
         elif peace:
             geo = Gesture.PEACE
+        elif thumb_pinky:
+            geo = Gesture.SHAKA
+        elif pinky_only:
+            geo = Gesture.PINKY
+        elif four_fingers:
+            geo = Gesture.FOUR
+        elif one_finger:
+            geo = Gesture.ONE
         else:
             geo = Gesture.OPEN
 
@@ -162,12 +210,15 @@ class GestureEngine:
                 # nunca inventa modos (THREE/PEACE/FIST) nem mata um clique ativo
                 ml_ok = (
                     ml_g == Gesture.OPEN
+                    or (ml_g == Gesture.ONE and one_finger)
                     or (ml_g == Gesture.PINCH and self._pinch_index_on)
                     or (ml_g == Gesture.PINCH_MID and self._pinch_mid_on)
                     or (ml_g == Gesture.FIST and all_curled)
                     or (ml_g == Gesture.PEACE and peace)
                     or (ml_g == Gesture.THREE and three)
                     or (ml_g == Gesture.THUMB_UP and thumb_up)
+                    or (ml_g == Gesture.PINKY and pinky_only)
+                    or (ml_g == Gesture.SHAKA and thumb_pinky)
                 )
                 geo_click = geo in (Gesture.PINCH, Gesture.PINCH_MID)
                 if ml_ok and not (geo_click and ml_g == Gesture.OPEN):
@@ -178,8 +229,10 @@ class GestureEngine:
                         self._pinch_mid_on = True
 
         ext_count = sum(1 for c in curled if not c)
-        if not too_far and ext_count >= 4 and raw != Gesture.OPEN:
-            raw = Gesture.OPEN
+        pinch_active = self._pinch_index_on or self._pinch_mid_on
+        if (not too_far and ext_count >= 4 and raw not in (Gesture.OPEN, Gesture.FOUR)
+                and not pinch_active):
+            raw = Gesture.FOUR
 
         if raw == self._candidate:
             self._candidate_count += 1
@@ -194,6 +247,13 @@ class GestureEngine:
             raw == Gesture.PINCH_MID and pinch_mid_ratio < cfg.pinch_on_ratio * 0.75
         )
         if deep_click:
+            need_frames = 1
+
+        fast_release = (
+            self._committed in (Gesture.PINCH, Gesture.PINCH_MID, Gesture.FIST)
+            and raw == Gesture.OPEN
+        )
+        if fast_release:
             need_frames = 1
 
         event = None
@@ -251,10 +311,16 @@ class GestureEngine:
 
     @classmethod
     def _transition(cls, previous, current):
+        if current == Gesture.FOUR:
+            return "minimize", None
         if current == Gesture.PINCH_MID:
             return "right_click", None
         if current == Gesture.THUMB_UP:
             return "play_pause", None
+        if current == Gesture.PINKY:
+            return "copy", None
+        if current == Gesture.SHAKA:
+            return "paste", None
         was_left = previous in cls.LEFT_BUTTON_GESTURES
         is_left = current in cls.LEFT_BUTTON_GESTURES
         if is_left and not was_left:

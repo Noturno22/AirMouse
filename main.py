@@ -44,14 +44,18 @@ SETTINGS_FILE = os.path.join(
 BADGES = {
     Gesture.NONE: ("SEM MAO", (150, 150, 150)),
     Gesture.OPEN: ("MOVER", (80, 200, 255)),
+    Gesture.ONE: ("MOVER 1D", (80, 200, 255)),
     Gesture.PINCH: ("CLIQUE ESQ", (90, 220, 90)),
     Gesture.PINCH_MID: ("CLIQUE DIR", (60, 60, 235)),
     Gesture.FIST: ("ARRASTAR", (70, 130, 255)),
     Gesture.PEACE: ("SCROLL", (255, 80, 200)),
     Gesture.THREE: ("VOLUME", (255, 170, 60)),
     Gesture.THUMB_UP: ("PLAY/PAUSA", (140, 225, 225)),
+    Gesture.FOUR: ("MINIMIZAR", (255, 200, 50)),
+    Gesture.PINKY: ("COPIAR", (180, 120, 255)),
+    Gesture.SHAKA: ("COLAR", (120, 200, 180)),
 }
-MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.PINCH, Gesture.FIST})
+MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH, Gesture.FIST})
 COLOR_GRAY = (160, 160, 160)
 COLOR_WHITE = (245, 245, 245)
 COLOR_GREEN = (90, 220, 90)
@@ -271,24 +275,27 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
     if show_help:
         lines = (
             "AJUDA",
-            "mao aberta .... mover cursor",
-            "pinca index ... botao esquerdo (manter=arrastar)",
-            "punho ......... arrastar",
-            "pinca medio ... clique direito",
-            "dois dedos .... scroll",
+            "mao aberta / 1 dedo ... mover cursor",
+            "pinca index ............ botao esquerdo (manter=arrastar)",
+            "punho .................. arrastar",
+            "pinca medio ............ clique direito",
+            "dois dedos ............. scroll",
             "tres dedos + cima/baixo = volume",
-            "polegar cima .. play/pausa multimédia",
-            "punho esq (2 maos) = diminuir brilho",
-            "punho dir (2 maos) = aumentar brilho",
-            "fechar/abrir punho x2 = Ctrl+D",
-            "bye bye ........ Ctrl+E",
-            "PALMAS (x3) ... Alt+Tab",
+            "4 dedos ................ minimizar janela",
+            "polegar cima ........... play/pausa multimédia",
+            "dedo mindinho .......... copiar (Ctrl+C)",
+            "polegar + mindinho ..... colar (Ctrl+V)",
+            "punho esq (2 maos) .... diminuir brilho",
+            "punho dir (2 maos) .... aumentar brilho",
+            "fechar/abrir punho x2 .. Ctrl+D",
+            "bye bye ................ Ctrl+E",
+            "PALMAS (x3) ........... Alt+Tab",
             "2 maos abertas + afastar = lupa (zoom)",
-            "[ / ] ......... ganho -/+",
-            ", / . ......... suavidade",
-            "m ............. snap magnetico ON/OFF",
+            "[ / ] ................. ganho -/+",
+            ", / . ................. suavidade",
+            "m ..................... snap magnetico ON/OFF",
             "a ............. auto-afinacao | v voz | s gravar",
-            "espaco ........ pausar | Q sair",
+            "espaco ................ pausar | Q sair",
             "voz: jarvis <comando natural>",
         )
         cv2.rectangle(frame, (12, 120), (430, 120 + 20 * len(lines) + 12), COLOR_DARK, -1)
@@ -780,6 +787,21 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                     state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
                     state["flash"] = 5
                     emitter.clear()
+                elif event == "minimize":
+                    _keyboard_shortcut("win+down")
+                    toast("MINIMIZAR")
+                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+                    state["flash"] = 5
+                elif event == "copy":
+                    _keyboard_shortcut("ctrl+c")
+                    toast("COPIAR (Ctrl+C)")
+                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+                    state["flash"] = 5
+                elif event == "paste":
+                    _keyboard_shortcut("ctrl+v")
+                    toast("COLAR (Ctrl+V)")
+                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+                    state["flash"] = 5
                 elif event == "scroll" and ev_value is not None:
                     mouse.scroll(ev_value * cfg.scroll_gain_factor)
                 else:
@@ -1063,12 +1085,13 @@ def main():
     smooth_label = SMOOTH_PRESETS[smooth_idx][0] if smooth_idx >= 0 else "CUSTOM"
     print(f"Ecra: {mouse.screen_w}x{mouse.screen_h} | ganho: {cfg.move_gain:.1f} | suavidade: {smooth_label}")
     print(
-        "Gestos: mao aberta=mover | pinca index=clique/arrastar |"
+        "Gestos: mao aberta/1 dedo=mover | pinca index=clique/arrastar |"
         " punho=arrastar | pinca medio=clique dir | dois dedos=scroll |"
         " 3 dedos=cima/baixo=volume | polegar=play/pausa"
     )
     print(
-        "Novo: punho esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
+        "Novo: mindinho=copy | polegar+mindinho=paste |"
+        " punho esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
         " bye bye=Ctrl+E | 3 palmas=Alt+Tab | lupa | snap"
     )
     print(

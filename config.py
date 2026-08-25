@@ -64,14 +64,14 @@ class Config:
     multi_clap_count: int = 3
     multi_clap_window_s: float = 2.5
 
-    click_freeze_ms: int = 60
-    gesture_stable_frames: int = 3
+    click_freeze_ms: int = 100
+    gesture_stable_frames: int = 2
     warmup_frames: int = 10
     max_jump_frac: float = 0.35
 
     min_hand_scale_px: float = 55.0
-    pinch_on_ratio: float = 0.38
-    pinch_off_ratio: float = 0.55
+    pinch_on_ratio: float = 0.42
+    pinch_off_ratio: float = 0.58
 
     num_hands: int = 2
     hand_lock_radius_frac: float = 0.30
