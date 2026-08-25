@@ -1,0 +1,4 @@
+models/piper/*.onnx filter=lfs diff=lfs merge=lfs -text
+models/vosk-model-small-pt-0.3/** filter=lfs diff=lfs merge=lfs -text
+models/hand_landmarker.task filter=lfs diff=lfs merge=lfs -text
+models/gesture_mlp.npz filter=lfs diff=lfs merge=lfs -text
