@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs><filter id="g"><feGaussianBlur stdDeviation="0.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <g transform="translate(8,4)" filter="url(#g)">
+    <path d="M12 36 L12 28 Q12 24 14 22 L16 20" stroke="#969696" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M22 36 L22 28 Q22 24 20 22 L16 20" stroke="#969696" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M12 28 Q10 22 13 17 L16 14 L19 17 Q22 22 22 28 Z" stroke="#969696" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <path d="M12 24 Q8 22 6 18 Q5 14 7 13 Q9 12 10 15 L13 19" stroke="#969696" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <path d="M14 18 L13 8 Q13 5 15 4 Q17 3 17 6 L17 14" stroke="#969696" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <path d="M17 14 L17 5 Q17 2 19 1 Q21 0 21 3 L21 12" stroke="#969696" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <path d="M21 14 L21.5 6 Q22 3 24 2.5 Q26 2 25.5 5 L24 13" stroke="#969696" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <path d="M24 15 L25 8 Q25.5 5 27 5 Q28.5 5 28 8 L26 14" stroke="#969696" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  </g>
+  <text x="24" y="46" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="5" fill="#969696">NENHUM</text>
+</svg>

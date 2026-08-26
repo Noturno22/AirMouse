@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "AirMouse Mobile",
+    "slug": "airmouse-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.airmouse.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "AirMouse precisa de acesso à câmara para detetar gestos de mão",
+        "NSMicrophoneUsageDescription": "AirMouse precisa de acesso ao microfone para comandos de voz",
+        "NSSiriUsageDescription": "AirMouse pode usar Siri para comandos de voz"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1a1a1a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.airmouse.mobile",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "VIBRATE",
+        "SYSTEM_ALERT_WINDOW",
+        "WRITE_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "AirMouse precisa de acesso à câmara para detetar gestos de mão"
+        }
+      ],
+      [
+        "expo-vision-camera-v4-mediapipe/plugin",
+        {
+          "numHands": 2,
+          "minDetectionConfidence": 0.5,
+          "minPresenceConfidence": 0.5,
+          "minTrackingConfidence": 0.5
+        }
+      ],
+      [
+        "expo-dev-client",
+        {
+          "addGeneratedScheme": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8854f8b4-5ff4-4b8f-8279-6df948fbf502"
+      }
+    }
+  }
+}

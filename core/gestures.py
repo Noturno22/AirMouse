@@ -18,7 +18,6 @@ class Gesture(Enum):
     PEACE = "scroll"
     THREE = "volume"
     THUMB_UP = "play/pausa"
-    FOUR = "minimizar"
     PINKY = "copiar"
     SHAKA = "colar"
 
@@ -154,14 +153,6 @@ class GestureEngine:
             and curled[MIDDLE]
             and curled[RING]
         )
-        four_fingers = (
-            not curled[INDEX]
-            and not curled[MIDDLE]
-            and not curled[RING]
-            and not curled[PINKY]
-            and not self._pinch_index_on
-            and not self._pinch_mid_on
-        )
         thumb_up = False
         if all_curled:
             # polegar apontando claramente para cima, acima de todos os MCPs
@@ -193,8 +184,6 @@ class GestureEngine:
             geo = Gesture.SHAKA
         elif pinky_only:
             geo = Gesture.PINKY
-        elif four_fingers:
-            geo = Gesture.FOUR
         elif one_finger:
             geo = Gesture.ONE
         else:
@@ -209,7 +198,7 @@ class GestureEngine:
                 # a IA so pode confirmar o que a geometria tambem ve;
                 # nunca inventa modos (THREE/PEACE/FIST) nem mata um clique ativo
                 ml_ok = (
-                    ml_g == Gesture.OPEN
+                    (ml_g == Gesture.OPEN and geo == Gesture.OPEN)
                     or (ml_g == Gesture.ONE and one_finger)
                     or (ml_g == Gesture.PINCH and self._pinch_index_on)
                     or (ml_g == Gesture.PINCH_MID and self._pinch_mid_on)
@@ -227,12 +216,6 @@ class GestureEngine:
                         self._pinch_index_on = True
                     if raw == Gesture.PINCH_MID and pinch_mid_ratio < cfg.pinch_off_ratio:
                         self._pinch_mid_on = True
-
-        ext_count = sum(1 for c in curled if not c)
-        pinch_active = self._pinch_index_on or self._pinch_mid_on
-        if (not too_far and ext_count >= 4 and raw not in (Gesture.OPEN, Gesture.FOUR)
-                and not pinch_active):
-            raw = Gesture.FOUR
 
         if raw == self._candidate:
             self._candidate_count += 1
@@ -311,8 +294,6 @@ class GestureEngine:
 
     @classmethod
     def _transition(cls, previous, current):
-        if current == Gesture.FOUR:
-            return "minimize", None
         if current == Gesture.PINCH_MID:
             return "right_click", None
         if current == Gesture.THUMB_UP:

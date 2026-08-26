@@ -406,3 +406,50 @@ class MultiClapDetector:
             self._count = 0
             self._window_start = None
         return False
+
+
+class DualWaveDetector:
+    """Deteta ondas rapidas com as duas maos para atalhos (ex: Alt+Tab).
+
+    Rastreia o ponto medio X das duas maos e conta inversoes de direcao.
+    Apos M inversoes na janela temporal, dispara a accao.
+    """
+
+    def __init__(self, min_reversals=2, window_s=1.5,
+                 min_amplitude_px=20.0, cooldown_s=2.0):
+        self.min_reversals = min_reversals
+        self.window_s = window_s
+        self.min_amplitude_px = min_amplitude_px
+        self.cooldown_s = cooldown_s
+        self._points = []
+        self._until = 0.0
+
+    def update(self, palms, now):
+        if now < self._until:
+            return False
+        if len(palms) != 2:
+            self._points.clear()
+            return False
+        mid_x = (palms[0][0] + palms[1][0]) / 2.0
+        self._points.append((mid_x, now))
+        while self._points and now - self._points[0][1] > self.window_s:
+            self._points.pop(0)
+        if len(self._points) < 4:
+            return False
+        reversals = 0
+        last_dir = 0
+        prev_x = self._points[0][0]
+        for i in range(1, len(self._points)):
+            dx = self._points[i][0] - prev_x
+            if abs(dx) < self.min_amplitude_px:
+                continue
+            cur_dir = 1 if dx > 0 else -1
+            if last_dir != 0 and cur_dir != last_dir:
+                reversals += 1
+            last_dir = cur_dir
+            prev_x = self._points[i][0]
+        if reversals >= self.min_reversals:
+            self._points.clear()
+            self._until = now + self.cooldown_s
+            return True
+        return False

@@ -14,11 +14,10 @@ import numpy as np
 
 from core.nlu import parse_with_llm
 
-WAKE_GRAMMAR = ["[unk]", "jarvis", "jarbas"]
-WAKE_ALIASES = ("jarvis", "jarbas")
+WAKE_ALIASES = ("jarvis", "jarbas", "assistente", "computador")
 
-SIL_START_RMS = 620.0
-SIL_END_RMS = 400.0
+SIL_START_RMS = 550.0
+SIL_END_RMS = 380.0
 SILENCE_END_S = 1.0
 MAX_UTT_S = 7.0
 PREROLL_S = 0.45
@@ -85,9 +84,8 @@ def _rms_i16(raw_bytes):
 
 
 class VoiceEngine:
-    """Hibrido: Vosk (gramatica minima) deteta a palavra 'Jarvis'; o comando
-    seguinte e gravado com deteccao de silencio e transcrito pelo Whisper
-    local, sem vocabulario restrito."""
+    """Hibrido: VAD por energia para detetar atividade vocal; Whisper
+    para transcrever e detetar a wake word e o comando num unico passo."""
 
     def __init__(self, cfg, cmd_queue):
         self.cfg = cfg
@@ -126,9 +124,7 @@ class VoiceEngine:
             model_dir = ensure_vosk_model(self.cfg)
             SetLogLevel(-3)
             model = Model(model_dir)
-            self._rec = KaldiRecognizer(
-                model, 16000, json.dumps(WAKE_GRAMMAR, ensure_ascii=False)
-            )
+            self._rec = KaldiRecognizer(model, 16000)
             self._rec.SetWords(False)
         except Exception as exc:
             print(f"Aviso: nao foi possivel carregar o modelo de voz ({exc}).")
@@ -271,39 +267,49 @@ class VoiceEngine:
                 if self._rec.AcceptWaveform(data):
                     text = json.loads(self._rec.Result()).get("text", "")
                     if text:
-                        self._handle_wake(text, data)
+                        self._handle_vosk_result(text)
+                else:
+                    partial = json.loads(self._rec.PartialResult()).get("partial", "")
+                    if partial:
+                        self._handle_vosk_result(partial)
             except Exception:
                 continue
 
-    def _handle_wake(self, text, trigger_chunk=None):
+    def _handle_vosk_result(self, text):
         t = _strip_accents(text.lower()).strip()
         if not t:
             return
-        hit = False
-        for alias in WAKE_ALIASES + (
-            _strip_accents(self.cfg.voice_wake_word.lower()),
-        ):
-            first = t.split()[0] if t.split() else ""
-            if difflib.get_close_matches(first, (alias,), n=1, cutoff=0.6):
-                hit = True
-                break
-            if alias in t:
-                hit = True
-                break
-        close = difflib.get_close_matches(t, WAKE_ALIASES, n=1, cutoff=0.6)
-        if close:
-            hit = True
-        if not hit:
-            return
 
-        if self.cfg.voice_always_on:
-            rest = re.sub(
-                r"\b(jarvis|jarbas)\b", "", t, flags=re.IGNORECASE
-            ).strip()
-            if rest:
-                self._dispatch(rest)
-            return
+        for alias in WAKE_ALIASES:
+            if alias in t or difflib.get_close_matches(t, (alias,), n=1, cutoff=0.7):
+                if self.cfg.voice_always_on:
+                    rest = re.sub(
+                        r"\b(" + "|".join(WAKE_ALIASES) + r")\b", "", t, flags=re.IGNORECASE
+                    ).strip()
+                    if rest:
+                        self._dispatch(rest)
+                    return
+                self._listen_for_command()
+                return
 
+        words = t.split()
+        for word in words:
+            for alias in WAKE_ALIASES:
+                if difflib.get_close_matches(word, (alias,), n=1, cutoff=0.55):
+                    if self.cfg.voice_always_on:
+                        rest = re.sub(
+                            r"\b(" + "|".join(WAKE_ALIASES) + r")\b", "", t, flags=re.IGNORECASE
+                        ).strip()
+                        if rest:
+                            self._dispatch(rest)
+                        return
+                    self._listen_for_command()
+                    return
+
+        if self.cfg.voice_always_on and len(t.split()) >= 2:
+            self._dispatch(t)
+
+    def _listen_for_command(self):
         self.status = "listening"
         self._beep()
         if self.speaker is not None:
@@ -319,7 +325,7 @@ class VoiceEngine:
         if not said:
             self.status = "wake"
             if self.speaker is not None:
-                self.speaker.say("Não ouvi nada.")
+                self.speaker.say("Nao ouvi nada.")
             return
         self._dispatch(_strip_accents(said.lower()))
 
@@ -330,6 +336,6 @@ class VoiceEngine:
         else:
             print(f'(voz) nao entendi: "{text}"')
             if self.speaker is not None:
-                self.speaker.say("Não entendi.")
+                self.speaker.say("Nao entendi.")
         if self.status != "off":
             self.status = "wake"

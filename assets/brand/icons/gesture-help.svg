@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs><filter id="g"><feGaussianBlur stdDeviation="0.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <g transform="translate(0,2)" filter="url(#g)">
+    <circle cx="24" cy="22" r="14" stroke="#50C8FF" stroke-width="1.5" fill="none"/>
+    <text x="24" y="27" text-anchor="middle" font-family="'Space Grotesk', sans-serif" font-weight="700" font-size="18" fill="#50C8FF">?</text>
+  </g>
+  <text x="24" y="46" text-anchor="middle" font-family="'JetBrains Mono', monospace" font-size="5" fill="#50C8FF">AJUDA</text>
+</svg>

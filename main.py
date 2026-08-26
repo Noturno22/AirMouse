@@ -26,8 +26,8 @@ from core.snap import SnapEngine
 from core.tracker import HAND_CONNECTIONS, HandTracker, ensure_model
 from core.tray import TrayAppAdapter, TrayIcon
 from core.twohand import (
-    BrightnessCtl, ClapDetector, FistCycleDetector, HandPool,
-    MagnifierCtl, MultiClapDetector, WaveDetector,
+    BrightnessCtl, ClapDetector, DualWaveDetector, FistCycleDetector, HandPool,
+    MagnifierCtl, WaveDetector,
 )
 from core.tts import Speaker
 from core.voice import VoiceEngine
@@ -51,7 +51,6 @@ BADGES = {
     Gesture.PEACE: ("SCROLL", (255, 80, 200)),
     Gesture.THREE: ("VOLUME", (255, 170, 60)),
     Gesture.THUMB_UP: ("PLAY/PAUSA", (140, 225, 225)),
-    Gesture.FOUR: ("MINIMIZAR", (255, 200, 50)),
     Gesture.PINKY: ("COPIAR", (180, 120, 255)),
     Gesture.SHAKA: ("COLAR", (120, 200, 180)),
 }
@@ -281,14 +280,14 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
             "pinca medio ............ clique direito",
             "dois dedos ............. scroll",
             "tres dedos + cima/baixo = volume",
-            "4 dedos ................ minimizar janela",
             "polegar cima ........... play/pausa multimédia",
             "dedo mindinho .......... copiar (Ctrl+C)",
             "polegar + mindinho ..... colar (Ctrl+V)",
             "punho esq (2 maos) .... diminuir brilho",
             "punho dir (2 maos) .... aumentar brilho",
-            "fechar/abrir punho x2 .. Ctrl+D",
-            "bye bye ................ Ctrl+E",
+            "fechar/abrir punho x2 .. Win+D",
+            "bye bye (onda) ......... minimizar janela (Win+↓)",
+            "ondas 2 maos ........... Alt+Tab",
             "PALMAS (x3) ........... Alt+Tab",
             "2 maos abertas + afastar = lupa (zoom)",
             "[ / ] ................. ganho -/+",
@@ -339,6 +338,9 @@ def _keyboard_shortcut(combo):
         key_map = {
             "ctrl": Key.ctrl_l, "alt": Key.alt_l, "shift": Key.shift_l,
             "cmd": Key.cmd, "tab": Key.tab, "win": Key.cmd,
+            "down": Key.down, "up": Key.up, "left": Key.left, "right": Key.right,
+            "enter": Key.enter, "space": Key.space, "esc": Key.esc, "delete": Key.delete,
+            "home": Key.home, "end": Key.end, "pageup": Key.page_up, "pagedown": Key.page_down,
         }
         parts = combo.lower().split("+")
         keys = [key_map.get(p.strip(), p.strip()) for p in parts]
@@ -512,9 +514,7 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
         min_reversals=cfg.wave_min_reversals, window_s=cfg.wave_window_s,
         min_amplitude_px=cfg.wave_min_amplitude_px,
     )
-    multi_clap = MultiClapDetector(
-        claps_needed=cfg.multi_clap_count, window_s=cfg.multi_clap_window_s,
-    )
+    dual_wave = DualWaveDetector()
     light = LightBoost() if cfg.low_light_boost else None
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
@@ -655,8 +655,7 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
 
             if len(results) == 2 and not state["paused"]:
                 palms2 = [r[0].palm_center for r in results.values()]
-                scales2 = [r[0].hand_scale_px for r in results.values()]
-                if multi_clap.update(palms2, scales2, now):
+                if dual_wave.update(palms2, now):
                     _keyboard_shortcut("alt+tab")
                     toast("ALT+TAB")
 
@@ -677,12 +676,15 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
             right_fist_prev = right_fist
 
             mag_note = None
-            if magnifier is not None and len(results) == 2:
-                entries = [
-                    (r[0].gesture, r[0].palm_center, r[0].hand_scale_px)
-                    for r in results.values()
-                ]
-                mag_note = magnifier.update(entries, now)
+            if magnifier is not None:
+                if len(results) == 2:
+                    entries = [
+                        (r[0].gesture, r[0].palm_center, r[0].hand_scale_px)
+                        for r in results.values()
+                    ]
+                    mag_note = magnifier.update(entries, now)
+                elif magnifier.on:
+                    mag_note = magnifier.update([], now)
             ui["magnify"] = magnifier.last_action if (magnifier and magnifier.on) else ""
 
             if mag_note:
@@ -787,11 +789,6 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                     state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
                     state["flash"] = 5
                     emitter.clear()
-                elif event == "minimize":
-                    _keyboard_shortcut("win+down")
-                    toast("MINIMIZAR")
-                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
-                    state["flash"] = 5
                 elif event == "copy":
                     _keyboard_shortcut("ctrl+c")
                     toast("COPIAR (Ctrl+C)")
@@ -818,12 +815,12 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                     and hand_frame.gesture not in (Gesture.NONE, Gesture.PEACE, Gesture.THREE)
                     and not state["paused"]):
                 if fist_cycle.update(hand_frame.gesture, now):
-                    _keyboard_shortcut("ctrl+d")
-                    toast("CTRL+D")
+                    _keyboard_shortcut("win+d")
+                    toast("WIN+D")
                 if hand_frame.gesture == Gesture.OPEN:
                     if wave.update(hand_frame.palm_center[0], now):
-                        _keyboard_shortcut("ctrl+e")
-                        toast("CTRL+E")
+                        _keyboard_shortcut("win+down")
+                        toast("BYE BYE")
 
             tune_note = tuner.maybe_apply(time.monotonic(), filters, cfg)
             if tune_note:
