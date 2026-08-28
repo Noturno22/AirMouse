@@ -1,0 +1,43 @@
+# EAS Build excludes these from the upload archive.
+# O projeto mobile vive dentro deste repositório git (que contém também o app
+# de desktop em Python). Sem este ficheiro, o EAS empacota TUDO o que está
+# tracked no git — incluindo modelos de voz de ~50MB+ que fazem o upload
+# rebentar o espaço em disco (ENOSPC) e entrar ficheiros que o build não usa.
+
+# ---- Artefactos e código do app de DESKTOP (Python) ----------------------
+models/
+core/
+ui/
+tools/
+build/
+dist/
+*.py
+*.spec
+*.bat
+*.md
+requirements*.txt
+config.py
+main.py
+/assets/
+.venv/
+__pycache__/
+*.pyc
+# clone antigo/duplicado do app mobile que vive na raiz do repo (não é o de produção)
+/airmouse-mobile/
+
+# ---- Artefactos que o EAS não precisa (gerados localmente) ---------------
+# pastas nativas do projeto mobile (geradas por `expo prebuild`; o EAS regenera)
+/ios/
+/android/
+# caches / build locales
+node_modules/
+.expo/
+
+# ficheiros secretos / locais — nunca upload
+.env
+.env*.local
+*.p12
+*.p8
+*.jks
+*.key
+*.mobileprovision

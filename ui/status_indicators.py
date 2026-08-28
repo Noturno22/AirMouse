@@ -30,9 +30,14 @@ class StatusBadges(QWidget):
         lbl.setAlignment(Qt.AlignCenter)
         lbl.setFixedHeight(28)
         lbl.setMinimumWidth(60)
+        lbl._last = ("", "")
         return lbl
 
     def _style(self, lbl, text, color_name):
+        # Evita `setStyleSheet`/`setText` em todos os frames quando nada mudou.
+        if (text, color_name) == lbl._last:
+            return
+        lbl._last = (text, color_name)
         lbl.setText(text)
         lbl.setStyleSheet(
             f"background-color: rgba(10,10,18,204);"
@@ -57,6 +62,6 @@ class StatusBadges(QWidget):
 
         if hands > 0:
             self._hands.show()
-            self._style(self._hands, f"{hands} MAOS", TEXT_PRIMARY.name())
+            self._style(self._hands, f"{hands} MÃOS", TEXT_PRIMARY.name())
         else:
             self._hands.hide()

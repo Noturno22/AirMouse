@@ -26,13 +26,13 @@ GESTURE_LABELS = {}
 def init_gesture_colors():
     from core.gestures import Gesture
     mapping = {
-        Gesture.NONE:      (QColor(150, 150, 150), "SEM MAO"),
+        Gesture.NONE:      (QColor(150, 150, 150), "SEM MÃO"),
         Gesture.OPEN:      (QColor(80, 200, 255),  "MOVER"),
         Gesture.ONE:       (QColor(80, 200, 255),  "MOVER 1D"),
         Gesture.PINCH:     (QColor(90, 220, 90),   "CLIQUE ESQ"),
         Gesture.PINCH_MID: (QColor(60, 60, 235),   "CLIQUE DIR"),
-        Gesture.FIST:      (QColor(70, 130, 255),  "ARRASTAR"),
-        Gesture.PEACE:     (QColor(255, 80, 200),  "SCROLL"),
+        Gesture.FIST:      (QColor(255, 80, 200),   "SCROLL"),
+        Gesture.PEACE:     (QColor(70, 130, 255),   "DOIS DEDOS"),
         Gesture.THREE:     (QColor(255, 170, 60),  "VOLUME"),
         Gesture.THUMB_UP:  (QColor(140, 225, 225), "PLAY/PAUSA"),
         Gesture.PINKY:     (QColor(180, 120, 255), "COPIAR"),
@@ -121,6 +121,84 @@ QWidget#HelpPanel {
     background-color: rgba(10, 10, 18, 242);
     border: 1px solid #969696;
     border-radius: 8px;
+}
+QLabel#DashboardBrand {
+    background-color: transparent;
+    color: #F0F4F8;
+}
+CameraView#CameraPreview {
+    background-color: #000000;
+    border: 2px solid #50C8FF;
+    border-radius: 10px;
+}
+QWidget#MenuPanel {
+    background-color: rgba(16, 16, 30, 235);
+    border: 1px solid #50C8FF;
+    border-radius: 12px;
+}
+QWidget#BrandHeader {
+    background-color: transparent;
+}
+QLabel#HelpTitle {
+    color: #50C8FF;
+    font-family: 'Segoe UI';
+    font-size: 15px;
+    font-weight: bold;
+}
+QLabel#HelpSubtitle {
+    color: #969696;
+    font-family: 'Segoe UI';
+    font-size: 10px;
+}
+QLabel#HelpSection {
+    color: #50C8FF;
+    font-family: 'Segoe UI';
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+QLabel#HelpRow {
+    color: #F0F4F8;
+    font-family: 'Consolas';
+    font-size: 12px;
+}
+QLabel#MenuSection {
+    color: #7DD4FF;
+    font-family: 'Segoe UI';
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+QFrame#MenuDivider {
+    background-color: #1A1A2E;
+    border: none;
+    max-height: 1px;
+}
+QPushButton#MenuBtn {
+    background-color: transparent;
+    color: #F0F4F8;
+    border: 1px solid #1A1A2E;
+    border-left: 3px solid #50C8FF;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Consolas';
+    font-size: 12px;
+    font-weight: bold;
+    text-align: left;
+}
+QPushButton#MenuBtn:hover {
+    background-color: #1A1A2E;
+    border-left-color: #7DD4FF;
+    color: #FFFFFF;
+}
+QPushButton#MenuBtn:pressed {
+    background-color: #50C8FF;
+    color: #0A0A12;
+}
+QPushButton#MenuBtn:checked {
+    background-color: #50C8FF;
+    color: #0A0A12;
+    border-color: #7DD4FF;
 }
 QDialog#SettingsDialog {
     background-color: #0A0A12;

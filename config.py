@@ -14,10 +14,10 @@ class Config:
     filter_min_cutoff: float = 1.4
     filter_beta: float = 0.028
 
-    accel_min_gain: float = 1.2
-    accel_max_gain: float = 3.0
-    accel_ref_speed: float = 1400.0
-    accel_expo: float = 1.7
+    accel_min_gain: float = 1.0
+    accel_max_gain: float = 2.6
+    accel_ref_speed: float = 1200.0
+    accel_expo: float = 1.5
 
     predict_ms: float = 0.0
     emitter_rate_hz: float = 180.0
@@ -64,6 +64,13 @@ class Config:
     multi_clap_count: int = 3
     multi_clap_window_s: float = 2.5
 
+    # Comandos especiais da MAO ESQUERDA (totalmente separada da direita)
+    left_hand_commands: bool = True
+    left_hand_swipe_min_px: float = 45.0
+    left_hand_swipe_window_s: float = 0.5
+    left_hand_cooldown_s: float = 1.1
+    left_hand_scroll_deadzone_px: float = 18.0
+
     click_freeze_ms: int = 100
     gesture_stable_frames: int = 2
     warmup_frames: int = 10
@@ -109,4 +116,5 @@ class Config:
     gain_trim_frac: float = 0.2
 
     preview: bool = True
+    gui_enabled: bool = True
     selftest_frames: int = 0

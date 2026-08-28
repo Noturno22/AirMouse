@@ -22,7 +22,7 @@ class Toast(QLabel):
 
         self._fade = QPropertyAnimation(self, b"windowOpacity")
         self._fade.setDuration(200)
-        self._fade.setFinishValue(0.0)
+        self._fade.setEndValue(0.0)
         self._fade.finished.connect(self.hide)
 
     def show_toast(self, text, duration_ms=1300):

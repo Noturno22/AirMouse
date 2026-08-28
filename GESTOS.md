@@ -12,10 +12,9 @@ Referencia completa de todos os gestos, atalhos de teclado e comandos de voz.
 | 1 dedo (index) | Apenas o index levantado, restantes fechados | Mover o cursor (menos cancadito) |
 | Pinca index | Polegar + index juntos | Clique esquerdo (toque rapido = clique, segurar = arrastar) |
 | Pinca medio | Polegar + medio juntos | Clique direito |
-| Punho | Mao fechada | Arrastar (alternativo ao pinca) |
-| 2 dedos (peace) | Index + medio estendidos | Scroll (mao cima/baixo) |
+| Punho | Mao fechada, deslizar cima/baixo | Scroll (punho para cima = cima, para baixo = baixo) |
+| 2 dedos (peace) | Index + medio estendidos | (sem funcao ativa) |
 | 3 dedos | Index + medio + anel estendidos | Volume (mao cima/baixo) |
-| 4 dedos | Todos exceto polegar | Minimizar janela (Win+Down) |
 | Polegar para cima | Punho fechado, polegar para cima | Play/Pausa multimedia |
 | Dedo mindinho | Apenas o mindinho levantado | Copiar (Ctrl+C) |
 | Polegar + mindinho | Shaka: polegar + mindinho estendidos | Colar (Ctrl+V) |
@@ -33,10 +32,29 @@ Referencia completa de todos os gestos, atalhos de teclado e comandos de voz.
 | Gesto | Descricao | Accao |
 |---|---|---|
 | Palmas (x3) | 3 palmas rapidas com as duas maos | Alt+Tab (trocar janela) |
-| Punho esquerdo (2 maos) | Punho fechado com a mao esquerda | Diminuir brilho do ecra |
-| Punho direito (2 maos) | Punho fechado com a mao direita | Aumentar brilho do ecra |
+| Dois dedos esquerdo (2 maos) | Peace com a mao esquerda | Diminuir brilho do ecra |
+| Dois dedos direito (2 maos) | Peace com a mao direita | Aumentar brilho do ecra |
 | 2 maos abertas + afastar | Abrir as maos e afastar | Lupa (zoom in/out) |
 | Palma unica (clap) | Duas maos juntas rapido | Abrir/Fechar assistente 3D |
+
+---
+
+## Comandos da Mao Esquerda (separados da direita)
+
+A mao que aparece no **lado esquerdo do ecra** (preview espelhada) e a
+"mao de comandos"; a que aparece no **lado direito** move o cursor.
+A mao de comandos nunca move o cursor; so dispara acoes.
+
+| Gestos | Descricao | Accao |
+|---|---|---|
+| Swipe p/ a direita | Deslizar a mao esquerda lateralmente p/ a direita | Fechar a interface (janela GUI) |
+| Swipe p/ a esquerda | Deslizar a mao esquerda lateralmente p/ a esquerda | "Deslike": abrir a interface (janela GUI) |
+| Punho fechado (so ela) | Fechar apenas a mao esquerda | Fechar janela (Alt+F4) |
+
+> **Nota**: o swipe p/ a esquerda (deslike) abre a janela de configuracao; o swipe p/ a
+> direita fecha-a. O scroll passou para o **punho da mao de comandos** e ja nao usa a
+> mao esquerda nem os dois dedos.
+> O punho fecha a janela **apenas quando e a unica mao presente** (nao confunde com o brilho de 2 maos).
 
 ---
 
@@ -44,8 +62,8 @@ Referencia completa de todos os gestos, atalhos de teclado e comandos de voz.
 
 | Gesto | Accao | Atalho enviado |
 |---|---|---|
-| Fechar/abrir punho x2 | Ciclo rapido de fechar e abrir o punho 2 vezes | Ctrl+D |
-| Bye-bye (onda lateral) | Mover a mao de lado a lado 3x rapido | Ctrl+E |
+| Fechar/abrir punho x2 | Ciclo rapido de fechar e abrir o punho 2 vezes | Win+D (mostrar desktop) |
+| Bye-bye (onda lateral) | Mover a mao de lado a lado 3x rapido | Minimizar janela (Win+Down) |
 
 ### Como fazer o gesto bye-bye
 
@@ -67,7 +85,7 @@ Referencia completa de todos os gestos, atalhos de teclado e comandos de voz.
 | `A` | Toggle auto-afinacao |
 | `V` | Toggle comandos de voz |
 | `S` | Gravar definicoes em settings.json |
-| `H` | Mostrar/ocultar overlay de ajuda |
+| `H` | Mostrar/ocultar overlay de ajuda (F1 na janela da UI) |
 | `M` | Toggle snap magnetico |
 | `B` | Abrir assistente 3D |
 | `Espaco` | Pausar/retomar AirMouse |

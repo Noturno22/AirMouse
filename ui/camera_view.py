@@ -18,6 +18,7 @@ class CameraView(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._pixmap = QPixmap()
         self._scale = 1.0
         self._offset = QPoint(0, 0)
@@ -28,6 +29,11 @@ class CameraView(QWidget):
         self._frame_h = 0
         self.setMinimumSize(320, 240)
 
+        # Suavização visual do crosshair (só apresentação; o gesto é renderizado
+        # instantaneamente, tal como o cérebro o emite — sem latência percetível).
+        self._cross_smooth = {}          # lado -> palm_center suavizado (EMA)
+        self._cross_alpha = 0.5          # suavização EMA do crosshair
+
     def update_frame(self, frame_bgr, all_frames, active_side, flash):
         if frame_bgr is None:
             return
@@ -37,11 +43,30 @@ class CameraView(QWidget):
         self._frame_h = h
         qimg = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888).copy()
         self._pixmap = QPixmap.fromImage(qimg)
-        self._all_frames = all_frames or {}
+        self._all_frames = self._smooth_crosshairs(all_frames or {})
         self._active_side = active_side
         self._flash = flash
         self._recalc()
         self.update()
+
+    def _smooth_crosshairs(self, all_frames):
+        """Suaviza APENAS a posição do crosshair (EMA) para não tremer. O `gesture`
+        é renderizado tal como vem do cérebro — zero latência no reconhecimento."""
+        from dataclasses import replace
+        smoothed = {}
+        for side, hf in all_frames.items():
+            prev = self._cross_smooth.get(side)
+            px, py = hf.palm_center
+            if prev is None:
+                self._cross_smooth[side] = (px, py)
+            else:
+                a = self._cross_alpha
+                self._cross_smooth[side] = (
+                    prev[0] * (1 - a) + px * a,
+                    prev[1] * (1 - a) + py * a,
+                )
+            smoothed[side] = replace(hf, palm_center=self._cross_smooth[side])
+        return smoothed
 
     def _recalc(self):
         if self._pixmap.isNull():
@@ -111,7 +136,8 @@ class CameraView(QWidget):
             painter.drawLine(pa, pb)
 
     def _draw_crosshair(self, painter, hf, color):
-        px, py = self._to_w(hf.palm_center)
+        p = self._to_w(hf.palm_center)
+        px, py = p.x(), p.y()
         painter.setPen(QPen(color, 2))
         painter.drawLine(px - 14, py, px + 14, py)
         painter.drawLine(px, py - 14, px, py + 14)

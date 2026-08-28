@@ -14,7 +14,9 @@ class GestureBadge(QLabel):
         self.setAlignment(Qt.AlignCenter)
         self.setFixedHeight(52)
         self.setMinimumWidth(180)
-        self._apply(TEXT_SECONDARY, "SEM MAO")
+        self._last_color = None
+        self._last_text = None
+        self._apply(TEXT_SECONDARY, "SEM MÃO")
 
     def update_gesture(self, gesture, paused=False):
         if paused:
@@ -23,6 +25,13 @@ class GestureBadge(QLabel):
             self._apply(gesture_color(gesture), gesture_label(gesture))
 
     def _apply(self, color, text):
+        # Evita `setStyleSheet`/`setText` em todos os frames quando nada mudou.
+        # `setStyleSheet` re-pols a widget e é uma fonte de stutter no feed.
+        color_name = color.name()
+        if text == self._last_text and color_name == self._last_color:
+            return
+        self._last_text = text
+        self._last_color = color_name
         self.setText(text)
         self.setStyleSheet(
             f"background-color: rgba(10,10,18,204);"

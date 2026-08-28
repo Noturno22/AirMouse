@@ -12,7 +12,7 @@ import zipfile
 
 import numpy as np
 
-from core.nlu import parse_with_llm
+from core.nlu import parse_local, parse_with_llm
 
 WAKE_ALIASES = ("jarvis", "jarbas", "assistente", "computador")
 
@@ -91,6 +91,8 @@ class VoiceEngine:
         self.cfg = cfg
         self.cmd_queue = cmd_queue
         self.speaker = None
+        self.chat = None
+        self._chat_busy = False
         self.status = "off"
         self._running = False
         self._thread = None
@@ -101,6 +103,10 @@ class VoiceEngine:
 
     def set_speaker(self, speaker):
         self.speaker = speaker
+
+    def set_chat(self, chat):
+        """Liga o cliente de conversa por IA (respostas livres faladas)."""
+        self.chat = chat
 
     def start(self):
         if self._running:
@@ -330,12 +336,58 @@ class VoiceEngine:
         self._dispatch(_strip_accents(said.lower()))
 
     def _dispatch(self, text):
-        action, value = parse_with_llm(text, self.cfg)
+        # 1) Comando por regras locais (rapido, sem rede)
+        action, value = parse_local(text)
         if action is not None:
             self.cmd_queue.put({"action": action, "value": value, "text": text})
-        else:
+            if self.status != "off":
+                self.status = "wake"
+            return
+
+        # 2) Comando a desambiguar via IA
+        if self.chat is not None:
+            try:
+                mode, action = self.chat.classify(text)
+                if mode == "cmd":
+                    if action is None:
+                        action, value = parse_with_llm(text, self.cfg)
+                    else:
+                        value = None
+                    if action is not None:
+                        self.cmd_queue.put(
+                            {"action": action, "value": value, "text": text}
+                        )
+                        if self.status != "off":
+                            self.status = "wake"
+                        return
+                    # comando nao reconhecido pelo parser -> trata como conversa
+                if mode == "chat":
+                    self._reply_conversation(text)
+                    return
+            except Exception:
+                pass
+
+        # 3) Fallback: conversa livre com a IA
+        self._reply_conversation(text)
+
+    def _reply_conversation(self, text):
+        if self.chat is None or not getattr(self.cfg, "llm_enabled", True):
             print(f'(voz) nao entendi: "{text}"')
             if self.speaker is not None:
                 self.speaker.say("Nao entendi.")
+            return
+        self._chat_busy = True
+        self.status = "thinking"
+        try:
+            reply = self.chat.respond(text)
+        except Exception as exc:
+            print(f"(voz) erro de conversa: {exc}")
+            reply = "Desculpa, tive um problema a pensar."
+        finally:
+            self._chat_busy = False
+        if reply:
+            print(f'[jarvis] {reply}')
+            if self.speaker is not None:
+                self.speaker.say(reply, interrupt=True)
         if self.status != "off":
             self.status = "wake"

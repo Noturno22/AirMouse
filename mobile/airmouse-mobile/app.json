@@ -38,12 +38,6 @@
     },
     "plugins": [
       [
-        "expo-camera",
-        {
-          "cameraPermission": "AirMouse precisa de acesso à câmara para detetar gestos de mão"
-        }
-      ],
-      [
         "expo-vision-camera-v4-mediapipe/plugin",
         {
           "numHands": 2,

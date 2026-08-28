@@ -27,7 +27,7 @@ from core.tracker import HAND_CONNECTIONS, HandTracker, ensure_model
 from core.tray import TrayAppAdapter, TrayIcon
 from core.twohand import (
     BrightnessCtl, ClapDetector, DualWaveDetector, FistCycleDetector, HandPool,
-    MagnifierCtl, WaveDetector,
+    LeftHandDetector, MagnifierCtl, WaveDetector,
 )
 from core.tts import Speaker
 from core.voice import VoiceEngine
@@ -47,14 +47,14 @@ BADGES = {
     Gesture.ONE: ("MOVER 1D", (80, 200, 255)),
     Gesture.PINCH: ("CLIQUE ESQ", (90, 220, 90)),
     Gesture.PINCH_MID: ("CLIQUE DIR", (60, 60, 235)),
-    Gesture.FIST: ("ARRASTAR", (70, 130, 255)),
-    Gesture.PEACE: ("SCROLL", (255, 80, 200)),
+    Gesture.FIST: ("SCROLL", (255, 80, 200)),
+    Gesture.PEACE: ("DOIS DEDOS", (255, 80, 200)),
     Gesture.THREE: ("VOLUME", (255, 170, 60)),
     Gesture.THUMB_UP: ("PLAY/PAUSA", (140, 225, 225)),
     Gesture.PINKY: ("COPIAR", (180, 120, 255)),
     Gesture.SHAKA: ("COLAR", (120, 200, 180)),
 }
-MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH, Gesture.FIST})
+MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH})
 COLOR_GRAY = (160, 160, 160)
 COLOR_WHITE = (245, 245, 245)
 COLOR_GREEN = (90, 220, 90)
@@ -70,6 +70,8 @@ def parse_args():
     parser.add_argument("--preview", action="store_true", help="forca janela mesmo em modo bandeja")
     parser.add_argument("--gpu", action="store_true", help="tenta usar delegado GPU no tracker")
     parser.add_argument("--tray", action="store_true", help="modo bandeja: invisivel com icone na bandeja")
+    parser.add_argument("--no-gui", action="store_true",
+                        help="usa o preview OpenCV em vez da janela PySide6")
     parser.add_argument("--reset-config", action="store_true", help="apaga settings.json")
     parser.add_argument("--no-voice", action="store_true", help="desativa comandos de voz")
     parser.add_argument("--no-ai", action="store_true", help="desativa classificador IA de gestos")
@@ -107,6 +109,24 @@ def load_settings(cfg):
             data = json.load(fh)
         cfg.move_gain = max(float(data.get("move_gain", cfg.move_gain)), 0.6)
         cfg.snap_enabled = bool(data.get("snap_enabled", cfg.snap_enabled))
+        if "mirror" in data:
+            cfg.mirror = bool(data["mirror"])
+        if "left_hand_commands" in data:
+            cfg.left_hand_commands = bool(data["left_hand_commands"])
+        if "low_light_boost" in data:
+            cfg.low_light_boost = bool(data["low_light_boost"])
+        if "deadzone_px" in data:
+            cfg.deadzone_px = max(float(data["deadzone_px"]), 0.0)
+        if "gesture_stable_frames" in data:
+            cfg.gesture_stable_frames = max(int(data["gesture_stable_frames"]), 1)
+        if "voice_enabled" in data:
+            cfg.voice_enabled = bool(data["voice_enabled"])
+        if "tts_enabled" in data:
+            cfg.tts_enabled = bool(data["tts_enabled"])
+        if "ai_enabled" in data:
+            cfg.ai_enabled = bool(data["ai_enabled"])
+        if "autotune_enabled" in data:
+            cfg.autotune_enabled = bool(data["autotune_enabled"])
         name = str(data.get("suavidade", "")).upper()
         found = False
         for i, (pname, cut, beta) in enumerate(SMOOTH_PRESETS):
@@ -141,6 +161,15 @@ def save_settings(cfg, smooth_name):
                     "filter_min_cutoff": round(cfg.filter_min_cutoff, 3),
                     "filter_beta": round(cfg.filter_beta, 4),
                     "snap_enabled": bool(cfg.snap_enabled),
+                    "mirror": bool(cfg.mirror),
+                    "left_hand_commands": bool(cfg.left_hand_commands),
+                    "low_light_boost": bool(cfg.low_light_boost),
+                    "deadzone_px": round(cfg.deadzone_px, 1),
+                    "gesture_stable_frames": int(cfg.gesture_stable_frames),
+                    "voice_enabled": bool(cfg.voice_enabled),
+                    "tts_enabled": bool(cfg.tts_enabled),
+                    "ai_enabled": bool(cfg.ai_enabled),
+                    "autotune_enabled": bool(cfg.autotune_enabled),
                 },
                 fh,
                 indent=2,
@@ -188,9 +217,9 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
             tip = tuple(int(v) for v in hf.index_tip)
             pinch_color = COLOR_GREEN if hf.gesture == Gesture.PINCH else COLOR_GRAY
             cv2.line(frame, thumb, tip, pinch_color, 2)
-            if hf.gesture == Gesture.PEACE:
+            if hf.gesture == Gesture.FIST:
                 mid = tuple(int(v) for v in hf.points_px[12])
-                cv2.circle(frame, mid, 7, BADGES[Gesture.PEACE][1], 2)
+                cv2.circle(frame, mid, 7, BADGES[Gesture.FIST][1], 2)
             color = c
 
     label = "PAUSA" if paused else BADGES.get(
@@ -242,7 +271,7 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
     if last_scroll is not None:
         cv2.putText(
             frame, f"scroll {last_scroll:+.0f} px/frame", (16, 112),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, BADGES[Gesture.PEACE][1], 1, cv2.LINE_AA,
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, BADGES[Gesture.FIST][1], 1, cv2.LINE_AA,
         )
 
     if ui.get("light"):
@@ -276,15 +305,17 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
             "AJUDA",
             "mao aberta / 1 dedo ... mover cursor",
             "pinca index ............ botao esquerdo (manter=arrastar)",
-            "punho .................. arrastar",
+            "punho + cima/baixo ..... scroll",
             "pinca medio ............ clique direito",
-            "dois dedos ............. scroll",
+            "dois dedos ............. (sem funcao)",
             "tres dedos + cima/baixo = volume",
             "polegar cima ........... play/pausa multimédia",
             "dedo mindinho .......... copiar (Ctrl+C)",
             "polegar + mindinho ..... colar (Ctrl+V)",
-            "punho esq (2 maos) .... diminuir brilho",
-            "punho dir (2 maos) .... aumentar brilho",
+            "swipe < com mao esq ..... abrir interface",
+            "swipe > com mao esq ..... fechar interface",
+            "dois dedos esq (2 maos)  diminuir brilho",
+            "dois dedos dir (2 maos)  aumentar brilho",
             "fechar/abrir punho x2 .. Win+D",
             "bye bye (onda) ......... minimizar janela (Win+↓)",
             "ondas 2 maos ........... Alt+Tab",
@@ -341,6 +372,9 @@ def _keyboard_shortcut(combo):
             "down": Key.down, "up": Key.up, "left": Key.left, "right": Key.right,
             "enter": Key.enter, "space": Key.space, "esc": Key.esc, "delete": Key.delete,
             "home": Key.home, "end": Key.end, "pageup": Key.page_up, "pagedown": Key.page_down,
+            "f1": Key.f1, "f2": Key.f2, "f3": Key.f3, "f4": Key.f4,
+            "f5": Key.f5, "f6": Key.f6, "f7": Key.f7, "f8": Key.f8,
+            "f9": Key.f9, "f10": Key.f10, "f11": Key.f11, "f12": Key.f12,
         }
         parts = combo.lower().split("+")
         keys = [key_map.get(p.strip(), p.strip()) for p in parts]
@@ -496,13 +530,20 @@ def _click_assist(ctx, state, mouse, cfg):
         pass
 
 
-def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx, state):
+def make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx):
+    """Constrói o contexto de motores/estado partilhado entre UIs.
+
+    Toda a lógica de reconhecimento/movimento vive aqui (intacta). Tanto o
+    preview OpenCV como a MainWindow PySide6 consomem o MESMO contexto, para
+    garantir paridade total de comportamento.
+    """
+    from types import SimpleNamespace
+
     pool = HandPool(cfg, gesture_ai)
     filters = FilterPair2D(cfg.filter_min_cutoff, cfg.filter_beta)
     curve = AccelCurve(cfg.accel_min_gain, cfg.accel_max_gain,
                        cfg.accel_ref_speed, cfg.accel_expo)
-    emitter = SmoothEmitter(mouse, cfg.emitter_rate_hz)
-    emitter.start()
+    emitter = None
 
     clap = ClapDetector() if cfg.clap_enabled else None
     magnifier = ctx.magnifier
@@ -515,20 +556,10 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
         min_amplitude_px=cfg.wave_min_amplitude_px,
     )
     dual_wave = DualWaveDetector()
+    left_hand = LeftHandDetector(cfg) if cfg.left_hand_commands else None
     light = LightBoost() if cfg.low_light_boost else None
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
-    state["smooth_name"] = (
-        SMOOTH_PRESETS[smooth_idx][0] if smooth_idx >= 0 else "CUSTOM"
-    )
-    state.setdefault("paused", False)
-    state.setdefault("show_help", False)
-    state.setdefault("flash", 0)
-    state.setdefault("freeze_until", 0.0)
-    state.setdefault("button_down", False)
-    state["filters"] = filters
-    state["tuner"] = tuner
-    state["emitter"] = emitter
     ui = {
         "ai_on": gesture_ai is not None,
         "ai_conf": 0.0,
@@ -540,352 +571,436 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
         "hands": 0,
         "light": False,
         "tts": "",
+        "ui_show": False,
     }
-
-    last_palm = None
-    prev_filtered = None
-    jump_streak = 0
-    fast_until = 0.0
-    glitches = 0
-    last_seq = -1
-    last_scroll = None
-    fps = 0.0
-    infer_total = 0.0
-    frames_done = 0
-    warmup_left = max(cfg.warmup_frames, 0)
-    started = None
-    window = "AirMouse"
-    active_side = None
-    last_accept_t = None
-    last_hand_t = None
-    dt_ema = 0.05
-    exposure_tried = False
-    gray_check = 0
-    left_fist_prev = False
-    right_fist_prev = False
 
     def toast(text):
         ui["toast"] = text
         ui["toast_until"] = time.monotonic() + 1.3
 
+    return SimpleNamespace(
+        pool=pool, filters=filters, curve=curve, emitter=emitter,
+        clap=clap, magnifier=magnifier, brightness=brightness,
+        fist_cycle=fist_cycle, wave=wave, dual_wave=dual_wave,
+        left_hand=left_hand, light=light, clahe=clahe, ui=ui, toast=toast,
+        smooth_name=(SMOOTH_PRESETS[smooth_idx][0] if smooth_idx >= 0 else "CUSTOM"),
+        last_palm=None, prev_filtered=None, jump_streak=0, fast_until=0.0,
+        glitches=0, last_seq=-1, last_scroll=None, fps=0.0, infer_total=0.0,
+        frames_done=0, warmup_left=max(cfg.warmup_frames, 0), started=None,
+        window="AirMouse",
+        # Com o ecrã espelhado (mirror=True), o lado esquerdo do ecrã corresponde
+        # à mão "Right" do MediaPipe (e vice-versa). A mão de comandos é a que o
+        # utilizador vê à ESQUERDA; a do cursor a que vê à DIREITA.
+        command_side="Left" if not cfg.mirror else "Right",
+        cursor_side="Right" if not cfg.mirror else "Left",
+        active_side=("Right" if not cfg.mirror else "Left"),
+        last_accept_t=None, last_hand_t=None, dt_ema=0.05,
+        exposure_tried=False, gray_check=0,
+        left_peace_prev=False, right_peace_prev=False, cmd_fist_prev=False,
+    )
+
+
+def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state, E):
+    """Processa UMA iteracao de câmara/gestos e devolve um snapshot.
+
+    Esta função contém TODO o cérebro da lógica (movimento, eventos,
+    left_hand, punho, brilho, clap, wave, voz, autotune...). É partilhada
+    pelo preview OpenCV e pela MainWindow PySide6 para paridade total.
+    """
+    loop_start = time.perf_counter()
+    frame, seq = cam.read()
+    if frame is None:
+        return {"frame": None, "done": False, "to_render": False}
+
+    if E.warmup_left > 0:
+        E.warmup_left -= 1
+        return {"frame": frame, "all_frames": {}, "active_side": E.active_side,
+                "last_scroll": E.last_scroll, "fps": E.fps, "ui": E.ui,
+                "done": False, "to_render": False}
+
+    if seq == E.last_seq:
+        return {"frame": None, "done": False, "to_render": False}
+    E.last_seq = seq
+
+    if cfg.mirror:
+        frame = cv2.flip(frame, 1)
+    h, w = frame.shape[:2]
+
+    E.gray_check += 1
+    if E.light is not None and E.gray_check % E.light.check_every == 0:
+        gmean = float(cv2.mean(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))[0])
+        evt = E.light.feed(gmean)
+        if evt == "on":
+            E.toast("LUZ BAIXA: realce ativado")
+            if not E.exposure_tried:
+                E.exposure_tried = True
+                cam.try_boost_exposure()
+        elif evt == "off":
+            E.toast("LUZ NORMAL")
+    if E.light is not None and E.light.active:
+        lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        lch, ach, bch = cv2.split(lab)
+        lch = E.clahe.apply(lch)
+        frame = cv2.cvtColor(cv2.merge((lch, ach, bch)), cv2.COLOR_LAB2BGR)
+
+    ts_ms = time.monotonic_ns() // 1_000_000
+    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    t_infer = time.perf_counter()
+    hands, sides = tracker.process(rgb, ts_ms)
+    E.infer_total += (time.perf_counter() - t_infer) * 1000.0
+
+    results = E.pool.update(hands, sides, w, h)
+    now = time.perf_counter()
+
+    event = None
+    ev_value = None
+    hand_frame = None
+
+    if results:
+        if E.active_side in results:
+            hand_frame, event, ev_value = results[E.active_side]
+        else:
+            prev_active = E.active_side
+            E.active_side = E.cursor_side if E.cursor_side in results else next(iter(results))
+            hand_frame, event, ev_value = results[E.active_side]
+            if prev_active is not None:
+                E.filters.reset()
+                E.last_palm = None
+                E.prev_filtered = None
+                E.jump_streak = 0
+                E.fast_until = 0.0
+                E.emitter.clear()
+
+    all_frames = {s: r[0] for s, r in results.items()}
+    E.ui["hands"] = len(results)
+
+    if E.clap is not None and len(results) == 2 and not state["paused"]:
+        palms = [r[0].palm_center for r in results.values()]
+        scales = [r[0].hand_scale_px for r in results.values()]
+        if E.clap.update(palms, scales, now):
+            note = ctx.assistant.toggle() if ctx.assistant else "ASSISTENTE OFF"
+            E.toast(note)
+            if ctx.speaker:
+                ctx.speaker.say(note)
+
+    if len(results) == 2 and not state["paused"]:
+        palms2 = [r[0].palm_center for r in results.values()]
+        if E.dual_wave.update(palms2, now):
+            _keyboard_shortcut("alt+tab")
+            E.toast("ALT+TAB")
+
+    # Gate da interface: swipe com a mao esquerda. "Deslike" (swipe para a
+    # esquerda / alt_tab_back) ABRE a janela GUI; swipe para a direita FECHA.
+    if E.left_hand is not None and not state["paused"]:
+        lpalm = results[E.command_side][0].palm_center if E.command_side in results else None
+        left_cmd, left_cmd_val = E.left_hand.update(lpalm, now)
+        if left_cmd == "alt_tab_back":
+            if not E.ui["ui_show"]:
+                E.ui["ui_show"] = True
+                E.toast("INTERFACE ON (deslike)")
+        elif left_cmd == "alt_tab_forward":
+            if E.ui["ui_show"]:
+                E.ui["ui_show"] = False
+                E.toast("INTERFACE OFF")
+
+    # Fechar a mao de comandos (so ela presente) = fechar janela (Alt+F4)
+    cmd_fist = (
+        E.left_hand is not None
+        and not state["paused"]
+        and len(results) == 1
+        and E.command_side in results
+        and results[E.command_side][0].gesture == Gesture.FIST
+    )
+    if cmd_fist and not E.cmd_fist_prev:
+        _keyboard_shortcut("alt+f4")
+        E.toast("FECHAR JANELA (Alt+F4)")
+    E.cmd_fist_prev = cmd_fist
+
+    # Luminosidade com Dois Dedos (PEACE) na mao: esquerda diminui, direita aumenta.
+    left_peace = False
+    right_peace = False
+    if len(results) == 2:
+        if "Left" in results:
+            left_peace = results["Left"][0].gesture == Gesture.PEACE
+        if "Right" in results:
+            right_peace = results["Right"][0].gesture == Gesture.PEACE
+    if left_peace and not E.left_peace_prev:
+        E.toast(E.brightness.decrease())
+    if right_peace and not E.right_peace_prev:
+        E.toast(E.brightness.increase())
+    E.left_peace_prev = left_peace
+    E.right_peace_prev = right_peace
+
+    mag_note = None
+    if E.magnifier is not None:
+        if len(results) == 2:
+            entries = [
+                (r[0].gesture, r[0].palm_center, r[0].hand_scale_px)
+                for r in results.values()
+            ]
+            mag_note = E.magnifier.update(entries, now)
+        elif E.magnifier.on:
+            mag_note = E.magnifier.update([], now)
+    E.ui["magnify"] = E.magnifier.last_action if (E.magnifier and E.magnifier.on) else ""
+
+    if mag_note:
+        E.toast(mag_note)
+
+    if hand_frame is not None and hand_frame.gesture != Gesture.NONE:
+        palm = hand_frame.palm_center
+        accept = True
+        if E.last_palm is not None:
+            d = math.hypot(palm[0] - E.last_palm[0], palm[1] - E.last_palm[1])
+            limit = cfg.max_jump_frac * w
+            if d <= limit:
+                E.jump_streak = 0
+                E.fast_until = 0.0
+            elif now < E.fast_until:
+                pass
+            elif E.jump_streak < 2:
+                E.jump_streak += 1
+                E.glitches += 1
+                accept = False
+            else:
+                E.jump_streak = 0
+                E.fast_until = now + 0.5
+        if accept:
+            if E.last_accept_t is not None:
+                inst_dt = now - E.last_accept_t
+                E.dt_ema = E.dt_ema * 0.7 + min(max(inst_dt, 0.008), 0.2) * 0.3
+            E.last_accept_t = now
+            E.last_palm = palm
+            E.last_hand_t = now
+            fx, fy = E.filters.filter(*palm)
+            if E.prev_filtered is None:
+                E.prev_filtered = (fx, fy)
+            dx = fx - E.prev_filtered[0]
+            dy = fy - E.prev_filtered[1]
+            E.prev_filtered = (fx, fy)
+
+            gain = cfg.move_gain * E.curve.apply(E.filters.vx, E.filters.vy)
+            sx = mouse.screen_w / w
+            sy = mouse.screen_h / h
+            mdx = dx * gain * sx
+            mdy = dy * gain * sy
+            movable = (
+                not state["paused"]
+                and now >= state["freeze_until"]
+                and hand_frame.gesture in MOVE_GESTURES
+                and not (E.magnifier is not None and E.magnifier.on)
+                and not (
+                    E.left_hand is not None
+                    and E.active_side == E.command_side
+                )
+            )
+            if movable and abs(mdx) < cfg.deadzone_px:
+                mdx = 0.0
+            if movable and abs(mdy) < cfg.deadzone_px:
+                mdy = 0.0
+            if movable:
+                vspeed_cap = E.curve.ref_speed * 4.0 * cfg.move_gain
+                vxs = mdx / E.dt_ema if E.dt_ema > 0 else 0.0
+                vys = mdy / E.dt_ema if E.dt_ema > 0 else 0.0
+                sp = math.hypot(vxs, vys)
+                if sp > vspeed_cap and sp > 0:
+                    k = vspeed_cap / sp
+                    vxs *= k
+                    vys *= k
+                lx, ly = lead_offset(vxs, vys, cfg.predict_ms)
+                try:
+                    cx, cy = mouse.mouse.position
+                    pxl, pyl = ctx.snap.pull((cx, cy), now) if ctx.snap else (0.0, 0.0)
+                except Exception:
+                    pxl = pyl = 0.0
+                E.emitter.push(mdx + lx + pxl, mdy + ly + pyl, E.dt_ema)
+            tuner.feed(True, E.filters, mdx, mdy)
+    else:
+        if hand_frame is None:
+            E.active_side = None
+        E.filters.reset()
+        E.last_palm = None
+        E.prev_filtered = None
+        E.jump_streak = 0
+        E.fast_until = 0.0
+        E.last_accept_t = None
+        E.emitter.clear()
+        tuner.feed(False, E.filters, 0.0, 0.0)
+        if state["button_down"] and (
+            E.last_hand_t is None or now - E.last_hand_t > 0.20
+        ):
+            mouse.release_left()
+            state["button_down"] = False
+    if E.left_hand is not None and E.active_side == E.command_side:
+        event = None
+
+    if event and (not state["paused"] or event == "left_up"):
+        if event == "left_down":
+            _click_assist(ctx, state, mouse, cfg)
+            mouse.press_left()
+            state["button_down"] = True
+            state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+            state["flash"] = 5
+            E.emitter.clear()
+        elif event == "left_up":
+            mouse.release_left()
+            state["button_down"] = False
+            E.emitter.clear()
+        elif event == "right_click":
+            _click_assist(ctx, state, mouse, cfg)
+            mouse.right_click()
+            state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+            state["flash"] = 5
+            E.emitter.clear()
+        elif event == "copy":
+            _keyboard_shortcut("ctrl+c")
+            E.toast("COPIAR (Ctrl+C)")
+            state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+            state["flash"] = 5
+        elif event == "paste":
+            _keyboard_shortcut("ctrl+v")
+            E.toast("COLAR (Ctrl+V)")
+            state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
+            state["flash"] = 5
+        elif event == "scroll" and ev_value is not None:
+            mouse.scroll(ev_value * cfg.scroll_gain_factor)
+        else:
+            media_note = _handle_media_event(event, ev_value)
+            if media_note:
+                E.toast(media_note)
+
+    if event == "scroll" and ev_value is not None:
+        E.last_scroll = ev_value
+    elif hand_frame is None or hand_frame.gesture != Gesture.FIST:
+        E.last_scroll = None
+
+    if (hand_frame is not None
+            and hand_frame.gesture not in (Gesture.NONE, Gesture.PEACE, Gesture.THREE)
+            and not state["paused"]):
+        if E.fist_cycle.update(hand_frame.gesture, now):
+            _keyboard_shortcut("win+d")
+            E.toast("WIN+D")
+        if hand_frame.gesture == Gesture.OPEN:
+            if E.wave.update(hand_frame.palm_center[0], now):
+                _keyboard_shortcut("win+down")
+                E.toast("BYE BYE")
+
+    tune_note = tuner.maybe_apply(time.monotonic(), E.filters, cfg)
+    if tune_note:
+        E.toast(tune_note)
+        state["smooth_name"] = "AUTO"
+
+    while True:
+        try:
+            cmd = voice.cmd_queue.get_nowait() if voice else None
+        except Exception:
+            cmd = None
+        if cmd is None:
+            break
+        action = cmd.get("action")
+        note = apply_command(action, cmd.get("value"), cfg, mouse, state, ctx)
+        if note:
+            print(f"[voz] {cmd.get('text','')!r} -> {note}")
+            E.toast(note)
+            if ctx.speaker:
+                ctx.speaker.say(note)
+        if ctx.exit_requested:
+            break
+
+    dt = time.perf_counter() - loop_start
+    inst = 1.0 / dt if dt > 0 else 0.0
+    E.fps = inst if E.frames_done == 0 else E.fps * 0.9 + inst * 0.1
+    if E.started is None:
+        E.started = loop_start
+    E.frames_done += 1
+
+    E.ui["ai_conf"] = hand_frame.ai_conf if hand_frame is not None else 0.0
+    if state.get("pinch_debug") and hand_frame is not None and now > state["dbg_until"]:
+        state["dbg_until"] = now + 0.25
+        print(
+            f"[pincha] idx={hand_frame.pinch_ratio:.2f} "
+            f"mid={hand_frame.pinch_mid_ratio:.2f} "
+            f"lim={cfg.pinch_on_ratio:.2f} -> {hand_frame.gesture.name}"
+        )
+    if voice:
+        st = voice.status
+        E.ui["voice"] = {"off": "off", "wake": "wake",
+                         "listening": "listening"}.get(st, st)
+    else:
+        E.ui["voice"] = "off"
+    E.ui["autotune"] = tuner.enabled
+    E.ui["light"] = E.light.active if E.light else False
+    if ctx.speaker:
+        E.ui["tts"] = ctx.speaker.status
+
+    if state["flash"] > 0:
+        state["flash"] -= 1
+
+    if cfg.selftest_frames and E.frames_done >= cfg.selftest_frames:
+        elapsed = time.perf_counter() - E.started
+        avg_fps = E.frames_done / elapsed if elapsed > 0 else 0.0
+        avg_infer = E.infer_total / E.frames_done if E.frames_done else 0.0
+        tts_name = ctx.speaker.status if ctx.speaker else "-"
+        snap_st = ctx.snap.status if ctx.snap else "-"
+        print(
+            f"[selftest] {E.frames_done} frames | {avg_fps:.1f} fps"
+            f" | inferencia {avg_infer:.1f} ms | glitches {E.glitches}"
+            f" | tts={tts_name} | snap={snap_st}"
+        )
+        return {"frame": frame, "all_frames": all_frames, "active_side": E.active_side,
+                "last_scroll": E.last_scroll, "fps": E.fps, "ui": E.ui,
+                "done": True, "to_render": True}
+
+    return {"frame": frame, "all_frames": all_frames, "active_side": E.active_side,
+            "last_scroll": E.last_scroll, "fps": E.fps, "ui": E.ui, "flash": state["flash"],
+            "done": False, "to_render": True}
+
+
+def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx, state):
+    E = make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx)
+    E.emitter = SmoothEmitter(mouse, cfg.emitter_rate_hz)
+    E.emitter.start()
+    state["smooth_name"] = E.smooth_name
+    state.setdefault("paused", False)
+    state.setdefault("show_help", False)
+    state.setdefault("flash", 0)
+    state.setdefault("freeze_until", 0.0)
+    state.setdefault("button_down", False)
+    state["filters"] = E.filters
+    state["tuner"] = tuner
+    state["emitter"] = E.emitter
+
     try:
         if cfg.preview:
-            cv2.namedWindow(window, cv2.WINDOW_NORMAL)
+            cv2.namedWindow(E.window, cv2.WINDOW_NORMAL)
 
         while True:
-            loop_start = time.perf_counter()
-            frame, seq = cam.read()
-            if frame is None:
-                time.sleep(0.002)
-                continue
-
-            if warmup_left > 0:
-                warmup_left -= 1
-                if cfg.preview:
-                    cv2.imshow(window, frame)
-                    if (cv2.waitKey(1) & 0xFF) in (ord("q"), 27):
-                        break
-                continue
-
-            if seq == last_seq:
-                time.sleep(0.002)
-                continue
-            last_seq = seq
-
-            if cfg.mirror:
-                frame = cv2.flip(frame, 1)
-            h, w = frame.shape[:2]
-
-            gray_check += 1
-            if light is not None and gray_check % light.check_every == 0:
-                gmean = float(cv2.mean(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))[0])
-                evt = light.feed(gmean)
-                if evt == "on":
-                    toast("LUZ BAIXA: realce ativado")
-                    if not exposure_tried:
-                        exposure_tried = True
-                        cam.try_boost_exposure()
-                elif evt == "off":
-                    toast("LUZ NORMAL")
-            if light is not None and light.active:
-                lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-                lch, ach, bch = cv2.split(lab)
-                lch = clahe.apply(lch)
-                frame = cv2.cvtColor(cv2.merge((lch, ach, bch)), cv2.COLOR_LAB2BGR)
-
-            ts_ms = time.monotonic_ns() // 1_000_000
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            t_infer = time.perf_counter()
-            hands, sides = tracker.process(rgb, ts_ms)
-            infer_total += (time.perf_counter() - t_infer) * 1000.0
-
-            results = pool.update(hands, sides, w, h)
-            now = time.perf_counter()
-
-            event = None
-            ev_value = None
-            hand_frame = None
-
-            if results:
-                if active_side in results:
-                    hand_frame, event, ev_value = results[active_side]
-                else:
-                    prev_active = active_side
-                    active_side = "Right" if "Right" in results else next(iter(results))
-                    hand_frame, event, ev_value = results[active_side]
-                    if prev_active is not None:
-                        filters.reset()
-                        last_palm = None
-                        prev_filtered = None
-                        jump_streak = 0
-                        fast_until = 0.0
-                        emitter.clear()
-
-            all_frames = {s: r[0] for s, r in results.items()}
-            ui["hands"] = len(results)
-
-            if clap is not None and len(results) == 2 and not state["paused"]:
-                palms = [r[0].palm_center for r in results.values()]
-                scales = [r[0].hand_scale_px for r in results.values()]
-                if clap.update(palms, scales, now):
-                    note = ctx.assistant.toggle() if ctx.assistant else "ASSISTENTE OFF"
-                    toast(note)
-                    if ctx.speaker:
-                        ctx.speaker.say(note)
-
-            if len(results) == 2 and not state["paused"]:
-                palms2 = [r[0].palm_center for r in results.values()]
-                if dual_wave.update(palms2, now):
-                    _keyboard_shortcut("alt+tab")
-                    toast("ALT+TAB")
-
-            left_fist = False
-            right_fist = False
-            if len(results) == 2:
-                if "Left" in results:
-                    left_fist = results["Left"][0].gesture == Gesture.FIST
-                if "Right" in results:
-                    right_fist = results["Right"][0].gesture == Gesture.FIST
-            if left_fist and not left_fist_prev:
-                note = brightness.decrease()
-                toast(note)
-            if right_fist and not right_fist_prev:
-                note = brightness.increase()
-                toast(note)
-            left_fist_prev = left_fist
-            right_fist_prev = right_fist
-
-            mag_note = None
-            if magnifier is not None:
-                if len(results) == 2:
-                    entries = [
-                        (r[0].gesture, r[0].palm_center, r[0].hand_scale_px)
-                        for r in results.values()
-                    ]
-                    mag_note = magnifier.update(entries, now)
-                elif magnifier.on:
-                    mag_note = magnifier.update([], now)
-            ui["magnify"] = magnifier.last_action if (magnifier and magnifier.on) else ""
-
-            if mag_note:
-                toast(mag_note)
-
-            if hand_frame is not None and hand_frame.gesture != Gesture.NONE:
-                palm = hand_frame.palm_center
-                accept = True
-                if last_palm is not None:
-                    d = math.hypot(palm[0] - last_palm[0], palm[1] - last_palm[1])
-                    limit = cfg.max_jump_frac * w
-                    if d <= limit:
-                        jump_streak = 0
-                        fast_until = 0.0
-                    elif now < fast_until:
-                        pass
-                    elif jump_streak < 2:
-                        jump_streak += 1
-                        glitches += 1
-                        accept = False
-                    else:
-                        jump_streak = 0
-                        fast_until = now + 0.5
-                if accept:
-                    if last_accept_t is not None:
-                        inst_dt = now - last_accept_t
-                        dt_ema = dt_ema * 0.7 + min(max(inst_dt, 0.008), 0.2) * 0.3
-                    last_accept_t = now
-                    last_palm = palm
-                    last_hand_t = now
-                    fx, fy = filters.filter(*palm)
-                    if prev_filtered is None:
-                        prev_filtered = (fx, fy)
-                    dx = fx - prev_filtered[0]
-                    dy = fy - prev_filtered[1]
-                    prev_filtered = (fx, fy)
-
-                    gain = cfg.move_gain * curve.apply(filters.vx, filters.vy)
-                    sx = mouse.screen_w / w
-                    sy = mouse.screen_h / h
-                    mdx = dx * gain * sx
-                    mdy = dy * gain * sy
-                    movable = (
-                        not state["paused"]
-                        and now >= state["freeze_until"]
-                        and hand_frame.gesture in MOVE_GESTURES
-                        and not (magnifier is not None and magnifier.on)
-                    )
-                    if movable and abs(mdx) < cfg.deadzone_px:
-                        mdx = 0.0
-                    if movable and abs(mdy) < cfg.deadzone_px:
-                        mdy = 0.0
-                    if movable:
-                        vspeed_cap = curve.ref_speed * 4.0 * cfg.move_gain
-                        vxs = mdx / dt_ema if dt_ema > 0 else 0.0
-                        vys = mdy / dt_ema if dt_ema > 0 else 0.0
-                        sp = math.hypot(vxs, vys)
-                        if sp > vspeed_cap and sp > 0:
-                            k = vspeed_cap / sp
-                            vxs *= k
-                            vys *= k
-                        lx, ly = lead_offset(vxs, vys, cfg.predict_ms)
-                        try:
-                            cx, cy = mouse.mouse.position
-                            pxl, pyl = ctx.snap.pull((cx, cy), now) if ctx.snap else (0.0, 0.0)
-                        except Exception:
-                            pxl = pyl = 0.0
-                        emitter.push(mdx + lx + pxl, mdy + ly + pyl, dt_ema)
-                    tuner.feed(True, filters, mdx, mdy)
-            else:
-                if hand_frame is None:
-                    active_side = None
-                filters.reset()
-                last_palm = None
-                prev_filtered = None
-                jump_streak = 0
-                fast_until = 0.0
-                last_accept_t = None
-                emitter.clear()
-                tuner.feed(False, filters, 0.0, 0.0)
-                if state["button_down"] and (
-                    last_hand_t is None or now - last_hand_t > 0.20
-                ):
-                    mouse.release_left()
-                    state["button_down"] = False
-
-            if event and (not state["paused"] or event == "left_up"):
-                if event == "left_down":
-                    _click_assist(ctx, state, mouse, cfg)
-                    mouse.press_left()
-                    state["button_down"] = True
-                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
-                    state["flash"] = 5
-                    emitter.clear()
-                elif event == "left_up":
-                    mouse.release_left()
-                    state["button_down"] = False
-                    emitter.clear()
-                elif event == "right_click":
-                    _click_assist(ctx, state, mouse, cfg)
-                    mouse.right_click()
-                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
-                    state["flash"] = 5
-                    emitter.clear()
-                elif event == "copy":
-                    _keyboard_shortcut("ctrl+c")
-                    toast("COPIAR (Ctrl+C)")
-                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
-                    state["flash"] = 5
-                elif event == "paste":
-                    _keyboard_shortcut("ctrl+v")
-                    toast("COLAR (Ctrl+V)")
-                    state["freeze_until"] = now + cfg.click_freeze_ms / 1000.0
-                    state["flash"] = 5
-                elif event == "scroll" and ev_value is not None:
-                    mouse.scroll(ev_value * cfg.scroll_gain_factor)
-                else:
-                    media_note = _handle_media_event(event, ev_value)
-                    if media_note:
-                        toast(media_note)
-
-            if event == "scroll" and ev_value is not None:
-                last_scroll = ev_value
-            elif hand_frame is None or hand_frame.gesture != Gesture.PEACE:
-                last_scroll = None
-
-            if (hand_frame is not None
-                    and hand_frame.gesture not in (Gesture.NONE, Gesture.PEACE, Gesture.THREE)
-                    and not state["paused"]):
-                if fist_cycle.update(hand_frame.gesture, now):
-                    _keyboard_shortcut("win+d")
-                    toast("WIN+D")
-                if hand_frame.gesture == Gesture.OPEN:
-                    if wave.update(hand_frame.palm_center[0], now):
-                        _keyboard_shortcut("win+down")
-                        toast("BYE BYE")
-
-            tune_note = tuner.maybe_apply(time.monotonic(), filters, cfg)
-            if tune_note:
-                toast(tune_note)
-                state["smooth_name"] = "AUTO"
-
-            while True:
-                try:
-                    cmd = voice.cmd_queue.get_nowait() if voice else None
-                except Exception:
-                    cmd = None
-                if cmd is None:
-                    break
-                action = cmd.get("action")
-                note = apply_command(action, cmd.get("value"), cfg, mouse, state, ctx)
-                if note:
-                    print(f"[voz] {cmd.get('text','')!r} -> {note}")
-                    toast(note)
-                    if ctx.speaker:
-                        ctx.speaker.say(note)
+            snap = process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state, E)
+            if snap["done"]:
+                break
+            if not snap["to_render"] or snap["frame"] is None:
                 if ctx.exit_requested:
                     break
-            if ctx.exit_requested:
-                break
-
-            dt = time.perf_counter() - loop_start
-            inst = 1.0 / dt if dt > 0 else 0.0
-            fps = inst if frames_done == 0 else fps * 0.9 + inst * 0.1
-            if started is None:
-                started = loop_start
-            frames_done += 1
-
-            ui["ai_conf"] = hand_frame.ai_conf if hand_frame is not None else 0.0
-            if state.get("pinch_debug") and hand_frame is not None and now > state["dbg_until"]:
-                state["dbg_until"] = now + 0.25
-                print(
-                    f"[pincha] idx={hand_frame.pinch_ratio:.2f} "
-                    f"mid={hand_frame.pinch_mid_ratio:.2f} "
-                    f"lim={cfg.pinch_on_ratio:.2f} -> {hand_frame.gesture.name}"
-                )
-            if voice:
-                st = voice.status
-                ui["voice"] = {"off": "off", "wake": "wake",
-                               "listening": "listening"}.get(st, st)
-            else:
-                ui["voice"] = "off"
-            ui["autotune"] = tuner.enabled
-            ui["light"] = light.active if light else False
-            if ctx.speaker:
-                ui["tts"] = ctx.speaker.status
+                continue
+            frame = snap["frame"]
+            all_frames = snap["all_frames"]
+            active_side = snap["active_side"]
+            fps = snap["fps"]
+            ui = snap["ui"]
 
             if cfg.preview:
                 draw_overlay(
-                    frame, all_frames, active_side, last_scroll, fps, cfg,
+                    frame, all_frames, active_side, E.last_scroll, fps, cfg,
                     state["smooth_name"], state["paused"], state["show_help"],
                     state["flash"], ui,
                 )
-                cv2.imshow(window, frame)
+                cv2.imshow(E.window, frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key in (ord("q"), 27):
                     break
                 if key == ord(" "):
                     note = apply_command("pause_toggle", None, cfg, mouse, state, ctx)
                     if note:
-                        toast(note)
+                        E.toast(note)
                 elif key == ord("["):
                     cfg.move_gain = max(0.6, round(cfg.move_gain - 0.2, 2))
                     tuner.set_user_gain(cfg.move_gain)
@@ -902,7 +1017,7 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                     _, cut, beta = SMOOTH_PRESETS[idx]
                     cfg.filter_min_cutoff = cut
                     cfg.filter_beta = beta
-                    filters.set_params(cut, beta)
+                    E.filters.set_params(cut, beta)
                     state["smooth_name"] = SMOOTH_PRESETS[idx][0]
                 elif key == ord("s"):
                     save_settings(cfg, state["smooth_name"])
@@ -912,35 +1027,22 @@ def run_loop(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx
                     if voice is not None:
                         voice.toggle()
                 elif key == ord("a"):
-                    toast(tuner.toggle())
+                    E.toast(tuner.toggle())
                 elif key == ord("m"):
                     if ctx.snap is not None and ctx.snap.available:
                         cfg.snap_enabled = ctx.snap.enabled
                         note = apply_command("snap_toggle", None, cfg, mouse, state, ctx)
-                        toast(str(note))
+                        E.toast(str(note))
                 elif key == ord("b"):
                     note = apply_command("assistant", None, cfg, mouse, state, ctx)
-                    toast(str(note))
+                    E.toast(str(note))
                     if ctx.speaker:
                         ctx.speaker.say(str(note))
 
-            if state["flash"] > 0:
-                state["flash"] -= 1
-
-            if cfg.selftest_frames and frames_done >= cfg.selftest_frames:
-                elapsed = time.perf_counter() - started
-                avg_fps = frames_done / elapsed if elapsed > 0 else 0.0
-                avg_infer = infer_total / frames_done if frames_done else 0.0
-                tts_name = ctx.speaker.status if ctx.speaker else "-"
-                snap_st = ctx.snap.status if ctx.snap else "-"
-                print(
-                    f"[selftest] {frames_done} frames | {avg_fps:.1f} fps"
-                    f" | inferencia {avg_infer:.1f} ms | glitches {glitches}"
-                    f" | tts={tts_name} | snap={snap_st}"
-                )
+            if ctx.exit_requested:
                 break
     finally:
-        emitter.stop()
+        E.emitter.stop()
         if state["button_down"]:
             mouse.release_left()
             state["button_down"] = False
@@ -960,6 +1062,52 @@ def resolve_assistant(cfg):
         )
     print("Aviso: barehands (server.py) nao encontrado; assistente 3D desativado.")
     return None
+
+
+def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, speaker,
+            snap, assistant, magnifier, ctx, state, tray_icon):
+    """Arranca a janela nativa PySide6 (MainWindow) como interface principal.
+
+    A MainWindow apresenta o feed com o esqueleto e overlays; a lógica de
+    reconhecimento/movimento vive em ``process_frame`` (partilhada com o
+    preview OpenCV), garantindo paridade total de comportamento.
+    """
+    try:
+        from PySide6.QtWidgets import QApplication
+        from ui.main_window import MainWindow
+    except Exception as exc:
+        print(f"Aviso: PySide6 indisponivel ({exc}); a usar preview OpenCV.")
+        cfg.gui_enabled = False
+        return None
+
+    app = QApplication.instance() or QApplication([])
+    window = MainWindow(
+        cfg, cam, tracker, mouse, gesture_ai=gesture_ai, voice=voice,
+        tuner=tuner, speaker=speaker, snap=snap,
+        assistant=assistant, magnifier=magnifier,
+    )
+    window.setWindowTitle("AirMouse")
+    window.resize(900, 640)
+    # Arranca OCULTA: a interface so aparece com o swipe "deslike" (esquerda)
+    # na mao de comandos. Serve apenas para configuracao.
+    window.hide()
+
+    # Ctrl+C na consola fecha a janela de forma limpa (sem interromper o
+    # MediaPipe no meio do processamento nem deixar tracebacks repetidos).
+    try:
+        import signal as _sig
+        from PySide6.QtCore import QTimer as _QTimer
+
+        def _on_sigint(signum, frame):
+            _QTimer.singleShot(0, window.close)
+
+        _sig.signal(_sig.SIGINT, _on_sigint)
+    except Exception:
+        pass
+
+    app.exec()
+    window.close()
+    return window
 
 
 def main():
@@ -1083,12 +1231,12 @@ def main():
     print(f"Ecra: {mouse.screen_w}x{mouse.screen_h} | ganho: {cfg.move_gain:.1f} | suavidade: {smooth_label}")
     print(
         "Gestos: mao aberta/1 dedo=mover | pinca index=clique/arrastar |"
-        " punho=arrastar | pinca medio=clique dir | dois dedos=scroll |"
+        " punho=cima/baixo=scroll | pinca medio=clique dir |"
         " 3 dedos=cima/baixo=volume | polegar=play/pausa"
     )
     print(
         "Novo: mindinho=copy | polegar+mindinho=paste |"
-        " punho esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
+        " dois dedos esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
         " bye bye=Ctrl+E | 3 palmas=Alt+Tab | lupa | snap"
     )
     print(
@@ -1098,20 +1246,35 @@ def main():
 
     exit_code = 0
     initial_params = (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta)
+    use_gui = (not args.no_gui) and not (cfg.selftest_frames or args.frames)
+    cfg.gui_enabled = use_gui
     try:
-        end_state = run_loop(
-            cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx,
-            state,
-        )
-        if (
-            (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta) != initial_params
-            or end_state.get("touched_settings")
-        ) and tuner.enabled:
-            save_settings(cfg, end_state["smooth_name"])
+        if use_gui:
+            run_gui(
+                cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice,
+                tuner, speaker, snap, assistant, magnifier, ctx, state,
+                tray_icon,
+            )
+            if (
+                (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta) != initial_params
+            ) and tuner.enabled:
+                save_settings(cfg, state.get("smooth_name", "NORMAL"))
+        else:
+            end_state = run_loop(
+                cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx,
+                state,
+            )
+            if (
+                (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta) != initial_params
+                or end_state.get("touched_settings")
+            ) and tuner.enabled:
+                save_settings(cfg, end_state["smooth_name"])
     except KeyboardInterrupt:
         print("\nAte ja!")
     except Exception as exc:
         print(f"ERRO fatal: {exc}")
+        import traceback
+        traceback.print_exc()
         exit_code = 1
     finally:
         if tray_icon is not None:

@@ -1,18 +1,23 @@
-"""Main frameless window with QTimer processing loop."""
-import math
+"""Main frameless window with QTimer processing loop.
+
+A MainWindow é apenas a APRESENTAÇÃO: toda a lógica de reconhecimento/
+movimento/gestos vive em ``process_frame``/``make_engine_ctx`` (main.py),
+partilhada com o preview OpenCV. Isto garante paridade total de comportamento
+entre as duas UIs.
+"""
+import json
+import os
 import time
 
 import cv2
-import numpy as np
 
-from PySide6.QtCore import Qt, QTimer, QPoint
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QMainWindow, QWidget, QLabel, QApplication
+from PySide6.QtWidgets import QMainWindow, QWidget, QLabel, QHBoxLayout
 
 from config import Config
 from ui.theme import (
-    MAIN_STYLESHEET, BG_PRIMARY, TEXT_PRIMARY, TEXT_SECONDARY,
-    FONT_MONO, FONT_STATUS,
+    MAIN_STYLESHEET, TEXT_PRIMARY, FONT_MONO, FONT_STATUS,
     init_gesture_colors, gesture_color, gesture_label,
 )
 from ui.camera_view import CameraView
@@ -21,15 +26,9 @@ from ui.status_indicators import StatusBadges
 from ui.voice_bar import VoiceBar
 from ui.toast import Toast
 from ui.help_panel import HelpPanel
+from ui.menu_panel import MenuPanel
 
 from core.gestures import Gesture
-from core.filters import FilterPair2D, AccelCurve
-from core.motion import SmoothEmitter, lead_offset
-from core.twohand import HandPool
-from core.light import LightBoost
-
-
-MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH, Gesture.FIST})
 
 
 class MainWindow(QMainWindow):
@@ -52,35 +51,27 @@ class MainWindow(QMainWindow):
         self._assistant = assistant
         self._magnifier = magnifier
 
-        self._filters = FilterPair2D(cfg.filter_min_cutoff, cfg.filter_beta)
-        self._curve = AccelCurve(cfg.accel_min_gain, cfg.accel_max_gain,
-                                 cfg.accel_ref_speed, cfg.accel_expo)
-        self._pool = HandPool(cfg, gesture_ai)
-        self._emitter = SmoothEmitter(mouse, cfg.emitter_rate_hz)
-        self._light = LightBoost() if cfg.low_light_boost else None
-        self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-
         self._paused = False
         self._show_help = False
         self._smooth_name = "NORMAL"
+        self._ui_show = False
         self._flash = 0
-        self._freeze_until = 0.0
-        self._button_down = False
-        self._last_palm = None
-        self._prev_filtered = None
-        self._jump_streak = 0
-        self._fast_until = 0.0
-        self._dt_ema = 0.05
-        self._last_accept_t = None
-        self._last_hand_t = None
-        self._active_side = None
         self._last_frame = None
+        self._all_frames = {}
+        self._active_side = None
         self._fps = 0.0
         self._fps_counter = 0
         self._fps_time = time.perf_counter()
-        self._warmup = cfg.warmup_frames
-        self._left_fist_prev = False
-        self._right_fist_prev = False
+
+        # A câmara serve APENAS para configuração/verificação: não é o fundo da
+        # janela nem interfere com o reconhecimento de gestos. O feed só aparece
+        # quando o utilizador ativa "VER CÂMERA" no menu. O rastreio de gestos
+        # continua sempre a correr em segundo plano.
+        self._camera_on = False
+
+        self._E = None
+        self._ctx = None
+        self._state = {}
 
         self._build_ui()
         self._build_shortcuts()
@@ -88,10 +79,9 @@ class MainWindow(QMainWindow):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
         self._timer.start(0)
-        self._emitter.start()
 
     def _build_ui(self):
-        self.setWindowTitle("Mãouse")
+        self.setWindowTitle("AirMouse")
         self.setObjectName("MainWindow")
         self.setMinimumSize(640, 480)
         self.resize(800, 600)
@@ -102,8 +92,19 @@ class MainWindow(QMainWindow):
         central.setObjectName("MainWindow")
         self.setCentralWidget(central)
 
+        # Painel de marca central (dashboard). O feed da câmara não é o fundo:
+        # a janela é um painel de controlo limpo; a câmara é um preview opcional.
+        self._brand = QLabel(central)
+        self._brand.setObjectName("DashboardBrand")
+        self._brand.setAlignment(Qt.AlignCenter)
+        self._brand.setText(
+            "<span style='font-size:44px;font-weight:bold;color:#50C8FF;'>MÃOUSE</span>"
+            "<br><span style='font-size:16px;color:#969696;'>Controlo do rato por gestos</span>"
+        )
+
         self._cam_view = CameraView(central)
-        self._cam_view.setGeometry(0, 0, 800, 600)
+        self._cam_view.setObjectName("CameraPreview")
+        self._cam_view.hide()
 
         self._gesture_badge = GestureBadge(central)
         self._gesture_badge.move(12, 10)
@@ -120,6 +121,9 @@ class MainWindow(QMainWindow):
         self._help = HelpPanel(central)
         self._help.move(12, 120)
 
+        self._menu = MenuPanel(central)
+        self._menu.setFixedWidth(168)
+
         self._status_bar = QLabel(central)
         self._status_bar.setObjectName("StatusBar")
         self._status_bar.setFont(FONT_STATUS)
@@ -131,8 +135,63 @@ class MainWindow(QMainWindow):
         self._fps_lbl.setFixedHeight(22)
         self._fps_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
+        self._build_menu()
+        self._build_shortcuts()
+
+    def _build_menu(self):
+        """Painel lateral de marca com botões agrupados (topo-direito)."""
+        m = self._menu
+        m.btn_pause.clicked.connect(self._toggle_pause)
+        m.btn_save.clicked.connect(self._save_settings)
+        m.btn_voice.toggled.connect(self._toggle_voice)
+        m.btn_snap.toggled.connect(self._toggle_snap)
+        m.btn_camera.toggled.connect(self._toggle_camera)
+        m.btn_help.toggled.connect(self._toggle_help)
+        m.btn_config.clicked.connect(self._open_settings)
+        m.btn_quit.clicked.connect(self.close)
+        self._menu_buttons = [
+            m.btn_pause, m.btn_save, m.btn_voice, m.btn_snap,
+            m.btn_camera, m.btn_help, m.btn_config, m.btn_quit,
+        ]
+
     def _build_shortcuts(self):
         pass
+
+    def _menu_checkable(self, btn, checked):
+        btn.setChecked(checked)
+
+    def _toggle_pause(self):
+        self._paused = not self._paused
+        self._menu.btn_pause.setText("⏸  PAUSA" if not self._paused else "▶  RETOMAR")
+        self._toast.show_toast("PAUSA" if self._paused else "RETOMAR")
+
+    def _toggle_voice(self, checked):
+        if self._voice:
+            self._voice.toggle()
+            self._toast.show_toast(f"VOZ {'ON' if checked else 'OFF'}")
+
+    def _toggle_snap(self, checked):
+        if self._snap and self._snap.available:
+            self._cfg.snap_enabled = checked
+            self._toast.show_toast(f"SNAP {'ON' if checked else 'OFF'}")
+
+    def _toggle_help(self, checked):
+        self._show_help = checked
+        self._help.toggle()
+
+    def _toggle_camera(self, checked):
+        """Mostra/oculta o preview da câmara. O reconhecimento de gestos NÃO é
+        afetado: o rastreio continua a correr em segundo plano o tempo todo."""
+        self._camera_on = checked
+        self._cam_view.setVisible(checked)
+        self._brand.setVisible(not checked)
+        self._layout_camera()
+        self._toast.show_toast("CÂMARA ON" if checked else "CÂMARA OFF")
+
+    def _sync_toolbar(self):
+        self._menu.btn_pause.setText("⏸  PAUSA" if not self._paused else "▶  RETOMAR")
+        self._menu_checkable(self._menu.btn_voice, bool(self._voice) and self._voice.status != "off")
+        self._menu_checkable(self._menu.btn_snap, bool(self._cfg.snap_enabled))
 
     def keyPressEvent(self, event):
         key = event.key()
@@ -157,6 +216,10 @@ class MainWindow(QMainWindow):
             if self._snap and self._snap.available:
                 self._cfg.snap_enabled = not self._cfg.snap_enabled
                 self._toast.show_toast(f"SNAP {'ON' if self._cfg.snap_enabled else 'OFF'}")
+        elif key == Qt.Key_C:
+            new_state = not self._camera_on
+            self._menu.btn_camera.setChecked(new_state)
+            self._toggle_camera(new_state)
         elif key == Qt.Key_F2:
             self._open_settings()
         elif key == Qt.Key_BracketLeft:
@@ -183,7 +246,8 @@ class MainWindow(QMainWindow):
         name, cut, beta = presets[idx]
         self._cfg.filter_min_cutoff = cut
         self._cfg.filter_beta = beta
-        self._filters.set_params(cut, beta)
+        if self._E is not None:
+            self._E.filters.set_params(cut, beta)
         self._smooth_name = name
         self._toast.show_toast(name)
 
@@ -192,13 +256,15 @@ class MainWindow(QMainWindow):
         dlg = SettingsDialog(self._cfg, self._smooth_name, self)
         if dlg.exec() == SettingsDialog.Accepted:
             self._smooth_name = dlg.smooth_name
-            self._filters.set_params(self._cfg.filter_min_cutoff, self._cfg.filter_beta)
-            self._toast.show_toast("Definicoes atualizadas")
+            if self._E is not None:
+                self._E.filters.set_params(self._cfg.filter_min_cutoff, self._cfg.filter_beta)
+            self._toast.show_toast("Definições atualizadas")
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w, h = self.width(), self.height()
-        self._cam_view.setGeometry(0, 0, w, h)
+        self._brand.setGeometry(0, int(h * 0.32), w, int(h * 0.36))
+        self._layout_camera()
         self._status.move(w - 310, 10)
         self._status.resize(300, 28)
         self._status_bar.setGeometry(0, h - 22, w, 22)
@@ -206,231 +272,93 @@ class MainWindow(QMainWindow):
         tw = self._toast.width() if self._toast.width() > 0 else 200
         self._toast.move((w - tw) // 2, 50)
 
+        bw = self._menu.width()
+        mw = self._menu.sizeHint() if hasattr(self._menu, "sizeHint") else None
+        mh = self._menu.sizeHint().height()
+        x = w - bw - 10
+        y = 10
+        self._menu.setGeometry(x, y, bw, mh)
+
+    def _layout_camera(self):
+        """Posiciona o preview da câmara como um painel centrado (não o fundo),
+        mantendo a proporção e cachê sem esticar o vídeo."""
+        w, h = self.width(), self.height()
+        if not self._camera_on:
+            return
+        cfg = self._cfg
+        fw, fh = cfg.frame_width, cfg.frame_height
+        max_w = w - 40
+        max_h = h - 90
+        scale = min(max_w / max(fw, 1), max_h / max(fh, 1))
+        sw = int(fw * scale)
+        sh = int(fh * scale)
+        x = (w - sw) // 2
+        y = 40
+        self._cam_view.setGeometry(x, y, sw, sh)
+        self._cam_view.raise_()
+
     # ── Processing Loop ─────────────────────────────────────────────
     def _tick(self):
-        frame, seq = self._cam.read()
-        if frame is None:
+        from main import process_frame, make_engine_ctx
+        from core.motion import SmoothEmitter
+
+        if self._ctx is None:
+            from main import AppCtl
+            self._ctx = AppCtl()
+        if self._E is None:
+            self._E = make_engine_ctx(self._cfg, -1, self._gesture_ai, self._tuner, self._ctx)
+            self._E.emitter = SmoothEmitter(self._mouse, self._cfg.emitter_rate_hz)
+            self._E.emitter.start()
+        self._state["smooth_name"] = self._smooth_name
+        self._ctx.speaker = self._speaker
+        self._ctx.snap = self._snap
+        self._ctx.assistant = self._assistant
+        self._ctx.magnifier = self._magnifier
+        self._state.setdefault("paused", False)
+        self._state.setdefault("show_help", False)
+        self._state.setdefault("flash", 0)
+        self._state.setdefault("freeze_until", 0.0)
+        self._state.setdefault("button_down", False)
+        self._state.setdefault("dbg_until", 0.0)
+        self._state["filters"] = self._E.filters
+        self._state["tuner"] = self._tuner
+        self._state["emitter"] = self._E.emitter
+
+        # O Ctrl+C (SIGINT) pode interromper o MediaPipe no meio de
+        # `tracker.process`. Para sair de forma limpa (sem tracebacks
+        # repetidos nem janela presa), fechamos a janela: o closeEvent para
+        # o timer e o app termina quando a janela única fechar.
+        try:
+            snap = process_frame(
+                self._cfg, self._cam, self._tracker, self._mouse,
+                self._gesture_ai, self._voice, self._tuner, self._ctx,
+                self._state, self._E,
+            )
+        except KeyboardInterrupt:
+            self.close()
             return
-
-        if self._warmup > 0:
-            self._warmup -= 1
+        if snap["done"] or self._ctx.exit_requested:
+            self.close()
             return
-
-        if self._cfg.mirror:
-            frame = cv2.flip(frame, 1)
-        h, w = frame.shape[:2]
-
-        if self._light is not None:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            gmean = float(cv2.mean(gray)[0])
-            evt = self._light.feed(gmean)
-            if evt:
-                self._toast.show_toast(
-                    "LUZ BAIXA: realce ativado" if evt == "on" else "LUZ NORMAL"
-                )
-        if self._light is not None and self._light.active:
-            lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-            lch, ach, bch = cv2.split(lab)
-            lch = self._clahe.apply(lch)
-            frame = cv2.cvtColor(cv2.merge((lch, ach, bch)), cv2.COLOR_LAB2BGR)
-
-        ts_ms = time.monotonic_ns() // 1_000_000
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        hands, sides = self._tracker.process(rgb, ts_ms)
-        results = self._pool.update(hands, sides, w, h)
-        now = time.perf_counter()
-
-        event = None
-        ev_value = None
-        hand_frame = None
-
-        if results:
-            if self._active_side in results:
-                hand_frame, event, ev_value = results[self._active_side]
-            else:
-                self._active_side = "Right" if "Right" in results else next(iter(results))
-                hand_frame, event, ev_value = results[self._active_side]
-                self._filters.reset()
-                self._last_palm = None
-                self._prev_filtered = None
-                self._jump_streak = 0
-                self._fast_until = 0.0
-                self._emitter.clear()
-
-        all_frames = {s: r[0] for s, r in results.items()}
-
-        self._last_frame = frame
-        self._process_movement(hand_frame, all_frames, w, h, now)
-        self._process_events(event, ev_value, now)
-        self._process_voice()
-        self._process_autotune(now)
-        self._update_fps()
-
-        if self._flash > 0:
-            self._flash -= 1
-
-        self._refresh_ui(all_frames, hand_frame)
-
-    def _process_movement(self, hand_frame, all_frames, w, h, now):
-        if hand_frame is not None and hand_frame.gesture != Gesture.NONE:
-            palm = hand_frame.palm_center
-            accept = True
-            if self._last_palm is not None:
-                d = math.hypot(palm[0] - self._last_palm[0], palm[1] - self._last_palm[1])
-                limit = self._cfg.max_jump_frac * w
-                if d <= limit:
-                    self._jump_streak = 0
-                    self._fast_until = 0.0
-                elif now < self._fast_until:
-                    pass
-                elif self._jump_streak < 2:
-                    self._jump_streak += 1
-                    accept = False
-                else:
-                    self._jump_streak = 0
-                    self._fast_until = now + 0.5
-
-            if accept:
-                if self._last_accept_t is not None:
-                    inst_dt = now - self._last_accept_t
-                    self._dt_ema = self._dt_ema * 0.7 + min(max(inst_dt, 0.008), 0.2) * 0.3
-                self._last_accept_t = now
-                self._last_palm = palm
-                self._last_hand_t = now
-                fx, fy = self._filters.filter(*palm)
-                if self._prev_filtered is None:
-                    self._prev_filtered = (fx, fy)
-                dx = fx - self._prev_filtered[0]
-                dy = fy - self._prev_filtered[1]
-                self._prev_filtered = (fx, fy)
-
-                gain = self._cfg.move_gain * self._curve.apply(self._filters.vx, self._filters.vy)
-                sx = self._mouse.screen_w / max(w, 1)
-                sy = self._mouse.screen_h / max(h, 1)
-                mdx = dx * gain * sx
-                mdy = dy * gain * sy
-                movable = (
-                    not self._paused
-                    and now >= self._freeze_until
-                    and hand_frame.gesture in MOVE_GESTURES
-                    and not (self._magnifier is not None and self._magnifier.on)
-                )
-                if movable:
-                    if abs(mdx) < self._cfg.deadzone_px:
-                        mdx = 0.0
-                    if abs(mdy) < self._cfg.deadzone_px:
-                        mdy = 0.0
-                    if abs(mdx) > 0 or abs(mdy) > 0:
-                        lx, ly = lead_offset(self._filters.vx, self._filters.vy, self._cfg.predict_ms)
-                        try:
-                            cx, cy = self._mouse.mouse.position
-                            pxl, pyl = self._snap.pull((cx, cy), now) if self._snap else (0.0, 0.0)
-                        except Exception:
-                            pxl = pyl = 0.0
-                        self._emitter.push(mdx + lx + pxl, mdy + ly + pyl, self._dt_ema)
-                if self._tuner:
-                    self._tuner.feed(True, self._filters, mdx, mdy)
-        else:
-            if hand_frame is None:
-                self._active_side = None
-            self._filters.reset()
-            self._last_palm = None
-            self._prev_filtered = None
-            self._jump_streak = 0
-            self._fast_until = 0.0
-            self._last_accept_t = None
-            self._emitter.clear()
-            if self._tuner:
-                self._tuner.feed(False, self._filters, 0.0, 0.0)
-            if self._button_down and (self._last_hand_t is None or now - self._last_hand_t > 0.20):
-                self._mouse.release_left()
-                self._button_down = False
-
-    def _process_events(self, event, ev_value, now):
-        if not event or (self._paused and event != "left_up"):
-            return
-        if event == "left_down":
-            self._mouse.press_left()
-            self._button_down = True
-            self._freeze_until = now + self._cfg.click_freeze_ms / 1000.0
-            self._flash = 5
-            self._emitter.clear()
-        elif event == "left_up":
-            self._mouse.release_left()
-            self._button_down = False
-            self._emitter.clear()
-        elif event == "right_click":
-            self._mouse.right_click()
-            self._freeze_until = now + self._cfg.click_freeze_ms / 1000.0
-            self._flash = 5
-            self._emitter.clear()
-        elif event == "copy":
-            self._key_combo("ctrl+c")
-            self._toast.show_toast("COPIAR (Ctrl+C)")
-            self._freeze_until = now + self._cfg.click_freeze_ms / 1000.0
-            self._flash = 5
-        elif event == "paste":
-            self._key_combo("ctrl+v")
-            self._toast.show_toast("COLAR (Ctrl+V)")
-            self._freeze_until = now + self._cfg.click_freeze_ms / 1000.0
-            self._flash = 5
-        elif event == "scroll" and ev_value is not None:
-            self._mouse.scroll(ev_value * self._cfg.scroll_gain_factor)
-        else:
-            note = self._handle_media(event, ev_value)
-            if note:
-                self._toast.show_toast(note)
-
-    def _process_voice(self):
-        if not self._voice:
-            return
-        while True:
-            try:
-                cmd = self._voice.cmd_queue.get_nowait()
-            except Exception:
-                break
-            action = cmd.get("action")
-            if action == "pause_toggle":
-                self._paused = not self._paused
-                note = "PAUSA" if self._paused else "RETOMAR"
-            elif action == "pause":
-                self._paused = True
-                note = "PAUSA"
-            elif action == "resume":
-                self._paused = False
-                note = "RETOMAR"
-            elif action == "gain_up":
-                self._cfg.move_gain = max(0.6, round(self._cfg.move_gain + 0.2, 2))
-                if self._tuner:
-                    self._tuner.set_user_gain(self._cfg.move_gain)
-                note = f"GANHO {self._cfg.move_gain:.1f}"
-            elif action == "gain_down":
-                self._cfg.move_gain = max(0.6, round(self._cfg.move_gain - 0.2, 2))
-                if self._tuner:
-                    self._tuner.set_user_gain(self._cfg.move_gain)
-                note = f"GANHO {self._cfg.move_gain:.1f}"
-            elif action == "exit":
-                note = "SAIR"
+        if not snap.get("to_render") or snap["frame"] is None:
+            if self._ctx.exit_requested:
                 self.close()
-            elif action == "snap_toggle":
-                if self._snap and self._snap.available:
-                    self._cfg.snap_enabled = not self._cfg.snap_enabled
-                    note = f"SNAP {'ON' if self._cfg.snap_enabled else 'OFF'}"
-                else:
-                    note = None
-            else:
-                note = None
-            if note:
-                self._toast.show_toast(str(note))
-                if self._speaker:
-                    self._speaker.say(str(note))
+            return
+        self._flash = snap.get("flash", self._state.get("flash", 0))
+        self._update_fps()
+        self._refresh_ui(snap)
 
-    def _process_autotune(self, now):
-        if self._tuner:
-            note = self._tuner.maybe_apply(time.monotonic(), self._filters, self._cfg)
-            if note:
-                self._toast.show_toast(note)
-                self._smooth_name = "AUTO"
+        # Gate por gesto: a janela so se mostra/oculta conforme o ROCK (chifre)
+        # na mao de comandos seja feito. Arranca oculta (apenas configuracao).
+        ui_show = bool(snap.get("ui", {}).get("ui_show", self._ui_show))
+        if ui_show != self._ui_show:
+            self._ui_show = ui_show
+            if ui_show:
+                self.show()
+                self.raise_()
+                self.activateWindow()
+            else:
+                self.hide()
 
     def _update_fps(self):
         self._fps_counter += 1
@@ -439,11 +367,21 @@ class MainWindow(QMainWindow):
             self._fps = self._fps_counter / elapsed
             self._fps_counter = 0
             self._fps_time = time.perf_counter()
+    def _refresh_ui(self, snap):
+        frame = snap["frame"]
+        all_frames = snap["all_frames"]
+        active_side = snap["active_side"]
+        self._last_frame = frame
+        self._all_frames = all_frames
+        self._active_side = active_side
+        hand_frame = all_frames.get(active_side)
 
-    def _refresh_ui(self, all_frames, hand_frame):
+        self._sync_toolbar()
+
         gesture = hand_frame.gesture if hand_frame else Gesture.NONE
         self._gesture_badge.update_gesture(gesture, self._paused)
-        self._cam_view.update_frame(self._last_frame, all_frames, self._active_side, self._flash)
+        if self._camera_on:
+            self._cam_view.update_frame(frame, all_frames, active_side, self._flash)
 
         ai_conf = hand_frame.ai_conf if hand_frame else 0.0
         hands = len(all_frames)
@@ -454,6 +392,11 @@ class MainWindow(QMainWindow):
             self._voice_bar.update_state(self._voice.status, self._cfg.voice_wake_word)
         else:
             self._voice_bar.update_state("off")
+
+        ui = snap["ui"]
+        if ui.get("toast") and time.monotonic() < ui.get("toast_until", 0):
+            self._toast.show_toast(ui["toast"])
+            ui["toast_until"] = 0
 
         strip = f"{self._fps:4.0f} fps | ganho {self._cfg.move_gain:.1f} | {self._smooth_name}"
         if self._tuner and self._tuner.enabled:
@@ -515,22 +458,44 @@ class MainWindow(QMainWindow):
                     "filter_min_cutoff": round(self._cfg.filter_min_cutoff, 3),
                     "filter_beta": round(self._cfg.filter_beta, 4),
                     "snap_enabled": bool(self._cfg.snap_enabled),
+                    "mirror": bool(self._cfg.mirror),
+                    "left_hand_commands": bool(self._cfg.left_hand_commands),
+                    "low_light_boost": bool(self._cfg.low_light_boost),
+                    "deadzone_px": round(self._cfg.deadzone_px, 1),
+                    "gesture_stable_frames": int(self._cfg.gesture_stable_frames),
+                    "voice_enabled": bool(self._cfg.voice_enabled),
+                    "tts_enabled": bool(self._cfg.tts_enabled),
+                    "ai_enabled": bool(self._cfg.ai_enabled),
+                    "autotune_enabled": bool(self._cfg.autotune_enabled),
                 }, fh, indent=2)
         except Exception as exc:
             print(f"ERRO ao gravar: {exc}")
 
     def closeEvent(self, event):
         self._timer.stop()
-        self._emitter.stop()
-        if self._button_down:
-            self._mouse.release_left()
-        if self._snap:
-            self._snap.stop()
-        if self._voice:
-            self._voice.stop()
-        if self._speaker:
-            self._speaker.stop()
-        self._tracker.close()
-        self._cam.release()
-        cv2.destroyAllWindows()
+        try:
+            if self._E is not None and self._E.emitter is not None:
+                self._E.emitter.stop()
+        except Exception:
+            pass
+        try:
+            if self._state.get("button_down"):
+                self._mouse.release_left()
+        except Exception:
+            pass
+        for obj, meth in (
+            (self._snap, "stop"), (self._voice, "stop"),
+            (self._speaker, "stop"), (self._tracker, "close"),
+            (self._cam, "release"),
+        ):
+            if obj is None or not hasattr(obj, meth):
+                continue
+            try:
+                getattr(obj, meth)()
+            except Exception:
+                pass
+        try:
+            cv2.destroyAllWindows()
+        except Exception:
+            pass
         event.accept()

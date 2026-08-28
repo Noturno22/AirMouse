@@ -18,7 +18,7 @@ class SystemTray(QSystemTrayIcon):
         super().__init__(parent)
         if icon_path:
             self.setIcon(QIcon(icon_path))
-        self.setToolTip("Mãouse")
+        self.setToolTip("AirMouse")
         self._build_menu()
 
     def _build_menu(self):
@@ -37,7 +37,7 @@ class SystemTray(QSystemTrayIcon):
         self._snap_act.triggered.connect(self.snap_toggled.emit)
         menu.addAction(self._snap_act)
         menu.addSeparator()
-        menu.addAction(QAction("Definicoes...", self, triggered=self.open_settings.emit))
+        menu.addAction(QAction("Definições...", self, triggered=self.open_settings.emit))
         menu.addSeparator()
         menu.addAction(QAction("Sair", self, triggered=self.quit_requested.emit))
         self.setContextMenu(menu)

@@ -453,3 +453,73 @@ class DualWaveDetector:
             self._until = now + self.cooldown_s
             return True
         return False
+
+
+class LeftHandDetector:
+    """Comandos especiais da MAO ESQUERDA, totalmente separada da direita.
+
+    A mao direita continua responsavel por mover o cursor/arrastar. A mao
+    esquerda, por sua vez, funciona como uma "mao de comandos":
+
+      * SWIPE horizontal (esq/dir) -> Alt+Tab / Alt+Shift+Tab (solta logo);
+      * DESLIZAR para cima/baixo   -> scroll (movimento vertical continuo).
+
+    Retorna um evento por chamada a update():
+      ('alt_tab_forward', None)  swipe para a direita
+      ('alt_tab_back', None)  swipe para a esquerda
+      ('scroll', value)  valor acumulado de scroll vertical
+    """
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.reset()
+
+    def reset(self):
+        self._samples = []
+        self._scroll_prev_y = None
+        self._scroll_acc = 0.0
+        self._swipe_until = 0.0
+
+    def update(self, palm, now):
+        """palm: (x, y) em px, ou None se a mao esquerda nao estiver visivel."""
+        cfg = self.cfg
+        if palm is None:
+            self.reset()
+            return None, None
+        px, py = palm
+        self._samples.append((px, py, now))
+        while self._samples and now - self._samples[0][2] > cfg.left_hand_swipe_window_s:
+            self._samples.pop(0)
+
+        ev = None
+        val = None
+
+        # SWIPE horizontal: deslocamento X dominante e rapido dentro da janela
+        if now >= self._swipe_until and len(self._samples) >= 3:
+            x0 = self._samples[0][0]
+            dx = px - x0
+            dy = py - self._samples[0][1]
+            if abs(dx) >= cfg.left_hand_swipe_min_px and abs(dx) > abs(dy) * 1.5:
+                ev = "alt_tab_forward" if dx > 0 else "alt_tab_back"
+                val = None
+                self._swipe_until = now + cfg.left_hand_cooldown_s
+                self._samples.clear()
+                self._scroll_acc = 0.0
+                self._scroll_prev_y = None
+
+        # Scroll vertical continuo (dominancia vertical, fora de cooldown de swipe)
+        if ev is None:
+            if self._scroll_prev_y is not None:
+                dy = py - self._scroll_prev_y
+                if abs(dy) >= cfg.left_hand_scroll_deadzone_px:
+                    direction = 1 if dy < 0 else -1
+                    self._scroll_acc += direction * abs(dy)
+                elif abs(py - self._samples[0][1]) > abs(px - self._samples[0][0]):
+                    self._scroll_acc = 0.0
+            self._scroll_prev_y = py
+            if abs(self._scroll_acc) >= cfg.left_hand_scroll_deadzone_px:
+                ev = "scroll"
+                val = self._scroll_acc
+                self._scroll_acc = 0.0
+
+        return ev, val

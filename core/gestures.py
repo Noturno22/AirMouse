@@ -20,6 +20,7 @@ class Gesture(Enum):
     THUMB_UP = "play/pausa"
     PINKY = "copiar"
     SHAKA = "colar"
+    ROCK = "interface"
 
 
 @dataclass
@@ -40,7 +41,7 @@ def _dist(a, b):
 
 
 class GestureEngine:
-    LEFT_BUTTON_GESTURES = (Gesture.PINCH, Gesture.FIST)
+    LEFT_BUTTON_GESTURES = (Gesture.PINCH,)
 
     def __init__(self, cfg, gesture_ai=None):
         self.cfg = cfg
@@ -55,6 +56,7 @@ class GestureEngine:
         self._scroll_acc_y = 0.0
         self._vol_prev_y = None
         self._vol_acc_y = 0.0
+        self._prev_curled = [False, False, False, False]
 
     def reset(self):
         self._pinch_index_on = False
@@ -66,12 +68,16 @@ class GestureEngine:
         self._scroll_acc_y = 0.0
         self._vol_prev_y = None
         self._vol_acc_y = 0.0
+        self._prev_curled = [False, False, False, False]
 
     def update(self, landmarks, width, height):
         cfg = self.cfg
         pts = [(lm[0] * width, lm[1] * height) for lm in landmarks]
         wrist = pts[0]
         scale = max(_dist(wrist, pts[9]), 1e-6)
+        # racio 2D: fiável de frente para a câmara (os dedos sobrepõem-se na projeção)
+        pinch_ratio_2d = _dist(pts[THUMB_TIP], pts[INDEX_TIP]) / scale
+        pinch_mid_ratio_2d = _dist(pts[THUMB_TIP], pts[MIDDLE_TIP]) / scale
         if len(landmarks[0]) > 2:
             # racio 3D: imune a inclinacao da mao (foreshortening)
             ky = height / width
@@ -83,16 +89,37 @@ class GestureEngine:
                 )
 
             scale3 = max(_d3(p3[0], p3[9]), 1e-6)
-            pinch_ratio = _d3(p3[THUMB_TIP], p3[INDEX_TIP]) / scale3
-            pinch_mid_ratio = _d3(p3[THUMB_TIP], p3[MIDDLE_TIP]) / scale3
+            pinch_ratio_3d = _d3(p3[THUMB_TIP], p3[INDEX_TIP]) / scale3
+            pinch_mid_ratio_3d = _d3(p3[THUMB_TIP], p3[MIDDLE_TIP]) / scale3
         else:
-            pinch_ratio = _dist(pts[THUMB_TIP], pts[INDEX_TIP]) / scale
-            pinch_mid_ratio = _dist(pts[THUMB_TIP], pts[MIDDLE_TIP]) / scale
+            pinch_ratio_3d = pinch_ratio_2d
+            pinch_mid_ratio_3d = pinch_mid_ratio_2d
+        # Pinça do INDICADOR (clique esq): mínimo(2D,3D) — robusto de frente para a
+        # câmara, onde o z-noise do MediaPipe inflaciona o rácio 3D acima do limiar.
+        pinch_ratio = min(pinch_ratio_2d, pinch_ratio_3d)
+        # Pinça do MÉDIO (clique dir): só 3D — a projeção 2D colapsa quando o polegar
+        # se curva sobre a palma (durante o agarrar) e daria cliques-direitos fantasmas.
+        pinch_mid_ratio = pinch_mid_ratio_3d
 
-        curled = [
-            _dist(pts[tip], wrist) <= _dist(pts[pip], wrist)
-            for tip, pip in FINGER_TIPS_PIPS
-        ]
+        # Dedos "dobrados" com deadband (Schmitt trigger): um dedo a pairar no
+        # limiar de dobrar/esticar (razão tip/pip ~ 1.0) não faz o gesto tremer
+        # de frame para frame (ex.: ONE<->OPEN, PEACE<->THREE, FIST<->THUMB_UP).
+        # Só muda de estado depois de cruzar uma folga confortável, usando o
+        # estado da frame anterior como memória. Casos claros comportam-se como
+        # antes (dobrado<=esticado), pelo que os valores de fluxo normal se mantêm.
+        fold_on_margin = 1.06   # para sair de "dobrado" tem de esticar bastante
+        fold_off_margin = 0.94  # para sair de "esticado" tem de dobrar bastante
+        curled = []
+        for i, (tip, pip) in enumerate(FINGER_TIPS_PIPS):
+            d_tip = _dist(pts[tip], wrist)
+            d_pip = max(_dist(pts[pip], wrist), 1e-6)
+            ratio = d_tip / d_pip
+            if self._prev_curled[i]:
+                now_curled = ratio < fold_on_margin
+            else:
+                now_curled = ratio < fold_off_margin
+            curled.append(now_curled)
+        self._prev_curled = curled
 
         if self._pinch_index_on:
             if pinch_ratio > cfg.pinch_off_ratio:
@@ -124,6 +151,13 @@ class GestureEngine:
             and not curled[MIDDLE]
             and not curled[RING]
             and _clearly_curled(PINKY)
+        )
+        # ROCK / "chifre": indicador + mindinho em pé, medio e anelar dobrados.
+        rock = (
+            not curled[INDEX]
+            and not curled[PINKY]
+            and _clearly_curled(MIDDLE)
+            and _clearly_curled(RING)
         )
         one_finger = (
             not curled[INDEX]
@@ -180,6 +214,8 @@ class GestureEngine:
             geo = Gesture.THREE
         elif peace:
             geo = Gesture.PEACE
+        elif rock:
+            geo = Gesture.ROCK
         elif thumb_pinky:
             geo = Gesture.SHAKA
         elif pinky_only:
@@ -249,7 +285,9 @@ class GestureEngine:
             self._committed = raw
             event, value = self._transition(previous, raw)
 
-        if self._committed == Gesture.PEACE:
+        # Scroll: punho fechado (FIST) na mao de comandos; deslizar para cima/baixo
+        # desloca o scroll na direcao oposta do movimento do punho.
+        if self._committed == Gesture.FIST:
             mid_y = (pts[INDEX_TIP][1] + pts[MIDDLE_TIP][1]) / 2.0
             if self._scroll_prev_y is not None:
                 dy = mid_y - self._scroll_prev_y
@@ -266,7 +304,8 @@ class GestureEngine:
             vol_y = (pts[8][1] + pts[12][1] + pts[16][1]) / 3.0
             if self._vol_prev_y is not None:
                 dy = vol_y - self._vol_prev_y
-                self._vol_acc_y -= dy
+                # mesmo sinal do scroll: mover para baixo -> valor positivo
+                self._vol_acc_y += dy
                 if abs(self._vol_acc_y) >= cfg.volume_deadzone_px:
                     event, value = "volume", self._vol_acc_y
                     self._vol_acc_y = 0.0

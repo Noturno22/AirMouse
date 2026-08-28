@@ -6,7 +6,6 @@
     "@mediapipe/hands": "^0.4.1675469240",
     "expo": "~57.0.16",
     "expo-blur": "~57.0.2",
-    "expo-camera": "~57.0.4",
     "expo-constants": "~57.0.14",
     "expo-dev-client": "~57.0.15",
     "expo-haptics": "~57.0.1",

@@ -105,12 +105,28 @@ for t in range(12):
         print(f"  fist virou {committed} na amostra {t}")
 check("FIST mantem-se FIST (sem play_pause)", ok_fist)
 
-# 4. Regressao: PEACE continua scroll
+# 4. Regressao: PEACE (dois dedos) ja NAO faz scroll
 skel_peace = synthesize(Gesture.PEACE, rng) * PX_SCALE
 eng = GestureEngine(cfg, None)
 feed(eng, skel_peace, 5)
-sc_events, _ = feed(eng, skel_peace, 8, dy_per_frame=6.0)
-check("PEACE continua scroll", any(e == "scroll" and v > 0 for e, v in sc_events), str(sc_events))
+peace_evs, _ = feed(eng, skel_peace, 8, dy_per_frame=6.0)
+check("PEACE ja nao faz scroll", all(e != "scroll" for e, _ in peace_evs), str(peace_evs))
+
+# 4b. FIST (punho fechado) e agora quem faz scroll: deslizar para baixo -> positivo
+skel_fist = synthesize(Gesture.FIST, np.random.default_rng(51)) * PX_SCALE
+eng = GestureEngine(cfg, None)
+feed(eng, skel_fist, 4)
+fist_evs, _ = feed(eng, skel_fist, 8, dy_per_frame=6.0)
+scrolls = [v for e, v in fist_evs if e == "scroll"]
+check("FIST faz scroll ao descer", len(scrolls) >= 1 and all(v > 0 for v in scrolls), str(fist_evs))
+eng = GestureEngine(cfg, None)
+feed(eng, skel_fist, 4)
+fist_up, _ = feed(eng, skel_fist, 8, dy_per_frame=-6.0)
+scrolls_up = [v for e, v in fist_up if e == "scroll"]
+check("FIST scroll negativo ao subir", len(scrolls_up) >= 1 and all(v < 0 for v in scrolls_up))
+check("FIST nao da clique (sem arrastar)",
+      all(e not in ("left_down", "left_up", "right_click") for e, _ in fist_evs) and
+      all(e not in ("left_down", "left_up", "right_click") for e, _ in fist_up))
 
 # 5. OPEN nao emite eventos
 skel_open = synthesize(Gesture.OPEN, rng) * PX_SCALE
@@ -161,6 +177,46 @@ check(
     "toque rapido down+up",
     got.count("left_down") == 1 and got.count("left_up") == 1,
     str([g for g in got if g]),
+)
+
+# 9. Regressao pinça de FRENTE para a camara (dedos apontam para a camara).
+# A partir de uma pinça geometrica valida, separamos polegar/indicador em z (z-ruido
+# do MediaPipe): o racio 3D sozinho dispara acima do limiar, mas o minimo(2D,3D) mantem.
+def with_z(skel_px, z_delta, tip_idx=4):
+    lm = to_lm(skel_px)
+    return [([l[0], l[1], z_delta if i == tip_idx else 0.0]) for i, l in enumerate(lm)]
+
+
+skel_pinch2 = synthesize(Gesture.PINCH, np.random.default_rng(1234)) * PX_SCALE
+eng = GestureEngine(cfg, FakeAI(Gesture.OPEN, 0.99))
+got = []
+for _ in range(6):
+    _, ev, _ = eng.update(with_z(skel_pinch2, 0.4), W, H)
+    got.append(ev)
+check(
+    "pinça de frente detetada (min 2D/3D)",
+    any(e == "left_down" for e in got),
+    str([g for g in got if g]),
+)
+
+# 10. Regressao: agarrar (FIST, polegar dobrado) nunca e roubado por uma pinça.
+def fist_with_thumb_curled():
+    skel = synthesize(Gesture.FIST, np.random.default_rng(7)) * PX_SCALE
+    lm = to_lm(skel)
+    # aproxima o polegar da regiao do medio, como quando se fecha o punho
+    lm[4] = [lm[9][0], lm[9][1]]
+    return lm
+
+
+eng = GestureEngine(cfg, None)
+last = None
+for _ in range(6):
+    _, ev, _ = eng.update(fist_with_thumb_curled(), W, H)
+    last = ev
+check(
+    "punho/pinca nunca da clique direito fantasma",
+    last not in ("right_click", "left_down", "left_up"),
+    f"ev={last}",
 )
 
 print(f"\n{passed} PASS / {failed} FAIL")
