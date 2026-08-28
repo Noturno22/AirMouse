@@ -47,14 +47,14 @@ BADGES = {
     Gesture.ONE: ("MOVER 1D", (80, 200, 255)),
     Gesture.PINCH: ("CLIQUE ESQ", (90, 220, 90)),
     Gesture.PINCH_MID: ("CLIQUE DIR", (60, 60, 235)),
-    Gesture.FIST: ("SCROLL", (255, 80, 200)),
-    Gesture.PEACE: ("DOIS DEDOS", (255, 80, 200)),
+    Gesture.FIST: ("ARRASTAR", (70, 130, 255)),
+    Gesture.PEACE: ("SCROLL", (255, 80, 200)),
     Gesture.THREE: ("VOLUME", (255, 170, 60)),
     Gesture.THUMB_UP: ("PLAY/PAUSA", (140, 225, 225)),
     Gesture.PINKY: ("COPIAR", (180, 120, 255)),
     Gesture.SHAKA: ("COLAR", (120, 200, 180)),
 }
-MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH})
+MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH, Gesture.FIST})
 COLOR_GRAY = (160, 160, 160)
 COLOR_WHITE = (245, 245, 245)
 COLOR_GREEN = (90, 220, 90)
@@ -70,8 +70,8 @@ def parse_args():
     parser.add_argument("--preview", action="store_true", help="forca janela mesmo em modo bandeja")
     parser.add_argument("--gpu", action="store_true", help="tenta usar delegado GPU no tracker")
     parser.add_argument("--tray", action="store_true", help="modo bandeja: invisivel com icone na bandeja")
-    parser.add_argument("--no-gui", action="store_true",
-                        help="usa o preview OpenCV em vez da janela PySide6")
+    parser.add_argument("--gui", action="store_true",
+                        help="usa a janela nativa PySide6 em vez do preview OpenCV")
     parser.add_argument("--reset-config", action="store_true", help="apaga settings.json")
     parser.add_argument("--no-voice", action="store_true", help="desativa comandos de voz")
     parser.add_argument("--no-ai", action="store_true", help="desativa classificador IA de gestos")
@@ -217,9 +217,9 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
             tip = tuple(int(v) for v in hf.index_tip)
             pinch_color = COLOR_GREEN if hf.gesture == Gesture.PINCH else COLOR_GRAY
             cv2.line(frame, thumb, tip, pinch_color, 2)
-            if hf.gesture == Gesture.FIST:
+            if hf.gesture == Gesture.PEACE:
                 mid = tuple(int(v) for v in hf.points_px[12])
-                cv2.circle(frame, mid, 7, BADGES[Gesture.FIST][1], 2)
+                cv2.circle(frame, mid, 7, BADGES[Gesture.PEACE][1], 2)
             color = c
 
     label = "PAUSA" if paused else BADGES.get(
@@ -271,7 +271,7 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
     if last_scroll is not None:
         cv2.putText(
             frame, f"scroll {last_scroll:+.0f} px/frame", (16, 112),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, BADGES[Gesture.FIST][1], 1, cv2.LINE_AA,
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, BADGES[Gesture.PEACE][1], 1, cv2.LINE_AA,
         )
 
     if ui.get("light"):
@@ -305,17 +305,15 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
             "AJUDA",
             "mao aberta / 1 dedo ... mover cursor",
             "pinca index ............ botao esquerdo (manter=arrastar)",
-            "punho + cima/baixo ..... scroll",
+            "punho .................. arrastar",
             "pinca medio ............ clique direito",
-            "dois dedos ............. (sem funcao)",
+            "dois dedos ............. scroll",
             "tres dedos + cima/baixo = volume",
             "polegar cima ........... play/pausa multimédia",
             "dedo mindinho .......... copiar (Ctrl+C)",
             "polegar + mindinho ..... colar (Ctrl+V)",
-            "swipe < com mao esq ..... abrir interface",
-            "swipe > com mao esq ..... fechar interface",
-            "dois dedos esq (2 maos)  diminuir brilho",
-            "dois dedos dir (2 maos)  aumentar brilho",
+            "punho esq (2 maos) .... diminuir brilho",
+            "punho dir (2 maos) .... aumentar brilho",
             "fechar/abrir punho x2 .. Win+D",
             "bye bye (onda) ......... minimizar janela (Win+↓)",
             "ondas 2 maos ........... Alt+Tab",
@@ -556,7 +554,7 @@ def make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx):
         min_amplitude_px=cfg.wave_min_amplitude_px,
     )
     dual_wave = DualWaveDetector()
-    left_hand = LeftHandDetector(cfg) if cfg.left_hand_commands else None
+    left_hand = LeftHandDetector(cfg) if (cfg.left_hand_commands and cfg.gui_enabled) else None
     light = LightBoost() if cfg.low_light_boost else None
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
@@ -588,15 +586,14 @@ def make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx):
         glitches=0, last_seq=-1, last_scroll=None, fps=0.0, infer_total=0.0,
         frames_done=0, warmup_left=max(cfg.warmup_frames, 0), started=None,
         window="AirMouse",
-        # Com o ecrã espelhado (mirror=True), o lado esquerdo do ecrã corresponde
-        # à mão "Right" do MediaPipe (e vice-versa). A mão de comandos é a que o
-        # utilizador vê à ESQUERDA; a do cursor a que vê à DIREITA.
+        # A mao da interface (LeftHandDetector) so existe em modo --gui; no modo
+        # de preview OpenCV (comportamento original) qualquer mao move o cursor.
         command_side="Left" if not cfg.mirror else "Right",
         cursor_side="Right" if not cfg.mirror else "Left",
-        active_side=("Right" if not cfg.mirror else "Left"),
+        active_side=None,
         last_accept_t=None, last_hand_t=None, dt_ema=0.05,
         exposure_tried=False, gray_check=0,
-        left_peace_prev=False, right_peace_prev=False, cmd_fist_prev=False,
+        left_fist_prev=False, right_fist_prev=False, cmd_fist_prev=False,
     )
 
 
@@ -661,7 +658,10 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
             hand_frame, event, ev_value = results[E.active_side]
         else:
             prev_active = E.active_side
-            E.active_side = E.cursor_side if E.cursor_side in results else next(iter(results))
+            if E.left_hand is not None and E.cursor_side in results:
+                E.active_side = E.cursor_side
+            else:
+                E.active_side = "Right" if "Right" in results else next(iter(results))
             hand_frame, event, ev_value = results[E.active_side]
             if prev_active is not None:
                 E.filters.reset()
@@ -716,20 +716,20 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
         E.toast("FECHAR JANELA (Alt+F4)")
     E.cmd_fist_prev = cmd_fist
 
-    # Luminosidade com Dois Dedos (PEACE) na mao: esquerda diminui, direita aumenta.
-    left_peace = False
-    right_peace = False
+    # Luminosidade com Punho (FIST) nas duas maos: esquerda diminui, direita aumenta.
+    left_fist = False
+    right_fist = False
     if len(results) == 2:
         if "Left" in results:
-            left_peace = results["Left"][0].gesture == Gesture.PEACE
+            left_fist = results["Left"][0].gesture == Gesture.FIST
         if "Right" in results:
-            right_peace = results["Right"][0].gesture == Gesture.PEACE
-    if left_peace and not E.left_peace_prev:
+            right_fist = results["Right"][0].gesture == Gesture.FIST
+    if left_fist and not E.left_fist_prev:
         E.toast(E.brightness.decrease())
-    if right_peace and not E.right_peace_prev:
+    if right_fist and not E.right_fist_prev:
         E.toast(E.brightness.increase())
-    E.left_peace_prev = left_peace
-    E.right_peace_prev = right_peace
+    E.left_fist_prev = left_fist
+    E.right_fist_prev = right_fist
 
     mag_note = None
     if E.magnifier is not None:
@@ -870,7 +870,7 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
 
     if event == "scroll" and ev_value is not None:
         E.last_scroll = ev_value
-    elif hand_frame is None or hand_frame.gesture != Gesture.FIST:
+    elif hand_frame is None or hand_frame.gesture != Gesture.PEACE:
         E.last_scroll = None
 
     if (hand_frame is not None
@@ -1088,9 +1088,11 @@ def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, spea
     )
     window.setWindowTitle("AirMouse")
     window.resize(900, 640)
-    # Arranca OCULTA: a interface so aparece com o swipe "deslike" (esquerda)
-    # na mao de comandos. Serve apenas para configuracao.
-    window.hide()
+    # A janela GUI arranca VISIVEL (a câmara aparece de imediato); o swipe
+    # "deslike" na mao de comandos fecha-a e o oposto reabre-a.
+    window.show()
+    window.raise_()
+    window.activateWindow()
 
     # Ctrl+C na consola fecha a janela de forma limpa (sem interromper o
     # MediaPipe no meio do processamento nem deixar tracebacks repetidos).
@@ -1231,12 +1233,12 @@ def main():
     print(f"Ecra: {mouse.screen_w}x{mouse.screen_h} | ganho: {cfg.move_gain:.1f} | suavidade: {smooth_label}")
     print(
         "Gestos: mao aberta/1 dedo=mover | pinca index=clique/arrastar |"
-        " punho=cima/baixo=scroll | pinca medio=clique dir |"
+        " punho=arrastar | pinca medio=clique dir | dois dedos=scroll |"
         " 3 dedos=cima/baixo=volume | polegar=play/pausa"
     )
     print(
         "Novo: mindinho=copy | polegar+mindinho=paste |"
-        " dois dedos esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
+        " punho esq/dir (2 maos)=brilho | fechar/abrir punho x2=Ctrl+D |"
         " bye bye=Ctrl+E | 3 palmas=Alt+Tab | lupa | snap"
     )
     print(
@@ -1246,7 +1248,7 @@ def main():
 
     exit_code = 0
     initial_params = (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta)
-    use_gui = (not args.no_gui) and not (cfg.selftest_frames or args.frames)
+    use_gui = args.gui and not (cfg.selftest_frames or args.frames)
     cfg.gui_enabled = use_gui
     try:
         if use_gui:

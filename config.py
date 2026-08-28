@@ -14,10 +14,10 @@ class Config:
     filter_min_cutoff: float = 1.4
     filter_beta: float = 0.028
 
-    accel_min_gain: float = 1.0
-    accel_max_gain: float = 2.6
-    accel_ref_speed: float = 1200.0
-    accel_expo: float = 1.5
+    accel_min_gain: float = 1.2
+    accel_max_gain: float = 3.0
+    accel_ref_speed: float = 1400.0
+    accel_expo: float = 1.7
 
     predict_ms: float = 0.0
     emitter_rate_hz: float = 180.0

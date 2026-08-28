@@ -1,7 +1,16 @@
 {
-  "move_gain": 1.92,
-  "suavidade": "AUTO",
+  "move_gain": 1.84,
+  "suavidade": "NORMAL",
   "filter_min_cutoff": 1.4,
   "filter_beta": 0.028,
-  "snap_enabled": false
+  "snap_enabled": false,
+  "mirror": true,
+  "left_hand_commands": true,
+  "low_light_boost": false,
+  "deadzone_px": 1.0,
+  "gesture_stable_frames": 2,
+  "voice_enabled": true,
+  "tts_enabled": true,
+  "ai_enabled": true,
+  "autotune_enabled": true
 }

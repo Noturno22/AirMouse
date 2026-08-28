@@ -28,14 +28,15 @@ SECTIONS = [
         (_dot(Gesture.OPEN), "mão aberta / 1 dedo", "mover cursor"),
         (_dot(Gesture.PINCH), "pinça (indicador)", "clique esq · manter = arrastar"),
         (_dot(Gesture.PINCH_MID), "pinça (médio)", "clique direito"),
+        (_dot(Gesture.FIST), "punho", "arrastar"),
     ]),
     ("SCROLL & VOLUME", [
-        (_dot(Gesture.FIST), "punho + cima/baixo", "scroll"),
+        (_dot(Gesture.PEACE), "dois dedos + cima/baixo", "scroll"),
         (_dot(Gesture.THREE), "três dedos + cima/baixo", "volume"),
     ]),
     ("BRILHO (2 MÃOS)", [
-        (_dot(Gesture.PEACE), "dois dedos · mão esq", "diminuir brilho"),
-        (_dot(Gesture.PEACE), "dois dedos · mão dir", "aumentar brilho"),
+        (_dot(Gesture.FIST), "punho · mão esq", "diminuir brilho"),
+        (_dot(Gesture.FIST), "punho · mão dir", "aumentar brilho"),
     ]),
     ("MULTIMÉDIA & SISTEMA", [
         (_dot(Gesture.THUMB_UP), "polegar cima", "play / pausa"),

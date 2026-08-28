@@ -31,7 +31,6 @@ try {
 }
 
 export default function App() {
-  const [permission, setPermission] = useState<boolean | null>(null);
   const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   
@@ -174,6 +173,20 @@ export default function App() {
     [landmarks]
   );
 
+  // Update FPS from the worklet via runOnJS (no React functions/refs are shared into the worklet)
+  const updateFps = useRef(
+    Worklets.createRunOnJS(() => {
+      frameCount.current++;
+      const now = Date.now();
+      if (now - lastFrameTime.current >= 1000) {
+        const fps = (frameCount.current * 1000) / (now - lastFrameTime.current);
+        setFps(fps);
+        frameCount.current = 0;
+        lastFrameTime.current = now;
+      }
+    })
+  );
+
   // Frame processor for real-time hand detection
   const frameProcessor = useFrameProcessor(
     (frame) => {
@@ -192,15 +205,8 @@ export default function App() {
         }
       }
 
-      // Calculate FPS
-      frameCount.current++;
-      const now = performance.now();
-      if (now - lastFrameTime.current >= 1000) {
-        const fps = (frameCount.current * 1000) / (now - lastFrameTime.current);
-        setFps(fps);
-        frameCount.current = 0;
-        lastFrameTime.current = now;
-      }
+      // Update FPS on the JS thread
+      updateFps.current();
     },
     [processHands]
   );
@@ -266,10 +272,6 @@ export default function App() {
       </View>
     );
   };
-
-  if (!permission) {
-    return <View style={styles.container} />;
-  }
 
   if (!hasPermission) {
     return (

@@ -87,7 +87,7 @@ class AccelCurve:
     (t**expo), que e mais precisa devagar e mais agressiva a varrer.
     """
 
-    def __init__(self, min_gain=1.0, max_gain=2.6, ref_speed=1200.0, expo=1.5):
+    def __init__(self, min_gain=1.2, max_gain=3.0, ref_speed=1400.0, expo=1.7):
         self.min_gain = float(min_gain)
         self.max_gain = float(max_gain)
         self.ref_speed = max(float(ref_speed), 1e-6)

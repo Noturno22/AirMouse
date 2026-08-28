@@ -63,11 +63,9 @@ class MainWindow(QMainWindow):
         self._fps_counter = 0
         self._fps_time = time.perf_counter()
 
-        # A câmara serve APENAS para configuração/verificação: não é o fundo da
-        # janela nem interfere com o reconhecimento de gestos. O feed só aparece
-        # quando o utilizador ativa "VER CÂMERA" no menu. O rastreio de gestos
-        # continua sempre a correr em segundo plano.
-        self._camera_on = False
+        # A câmara é o conteúdo principal da janela (semelhante ao preview original):
+        # aparece de imediato; o rastreio de gestos corre sempre em segundo plano.
+        self._camera_on = True
 
         self._E = None
         self._ctx = None
@@ -104,7 +102,8 @@ class MainWindow(QMainWindow):
 
         self._cam_view = CameraView(central)
         self._cam_view.setObjectName("CameraPreview")
-        self._cam_view.hide()
+        self._cam_view.show()
+        self._brand.hide()
 
         self._gesture_badge = GestureBadge(central)
         self._gesture_badge.move(12, 10)
@@ -149,6 +148,8 @@ class MainWindow(QMainWindow):
         m.btn_help.toggled.connect(self._toggle_help)
         m.btn_config.clicked.connect(self._open_settings)
         m.btn_quit.clicked.connect(self.close)
+        if self._camera_on:
+            m.btn_camera.setChecked(True)
         self._menu_buttons = [
             m.btn_pause, m.btn_save, m.btn_voice, m.btn_snap,
             m.btn_camera, m.btn_help, m.btn_config, m.btn_quit,
