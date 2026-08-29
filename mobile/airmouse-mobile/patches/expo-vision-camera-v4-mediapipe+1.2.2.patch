@@ -1,0 +1,112 @@
+diff --git a/node_modules/expo-vision-camera-v4-mediapipe/plugin/index.js b/node_modules/expo-vision-camera-v4-mediapipe/plugin/index.js
+index 97c5d32..96ba256 100644
+--- a/node_modules/expo-vision-camera-v4-mediapipe/plugin/index.js
++++ b/node_modules/expo-vision-camera-v4-mediapipe/plugin/index.js
+@@ -161,9 +161,10 @@ function getHandLandmarkerPluginKotlin(packageName, options) {
+ 
+   return `package ${packageName}
+ 
++import android.graphics.Bitmap
+ import android.media.Image
+ import android.util.Log
+-import com.google.mediapipe.framework.image.MediaImageBuilder
++import com.google.mediapipe.framework.image.BitmapImageBuilder
+ import com.google.mediapipe.framework.image.MPImage
+ import com.google.mediapipe.tasks.core.BaseOptions
+ import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
+@@ -228,6 +229,81 @@ ${poseInit}${faceInit}        } catch (e: Exception) {
+         }
+     }
+ 
++    /**
++     * Converte a imagem YUV_420_888 da câmara num Bitmap ARGB_8888,
++     * respeitando os rowStride/pixelStride de cada plano.
++     * Necessário porque o MediaPipe (MediaImageBuilder) exige RGBA_8888.
++     */
++    private fun frameToBitmap(mediaImage: Image): Bitmap {
++        val width = mediaImage.width
++        val height = mediaImage.height
++
++        val yPlane = mediaImage.planes[0]
++        val uPlane = mediaImage.planes[1]
++        val vPlane = mediaImage.planes[2]
++
++        val yRowStride = yPlane.rowStride
++        val uvRowStride = uPlane.rowStride
++        val uvPixelStride = uPlane.pixelStride
++
++        val yBuffer = yPlane.buffer.duplicate().apply { rewind() }
++        val uBuffer = uPlane.buffer.duplicate().apply { rewind() }
++        val vBuffer = vPlane.buffer.duplicate().apply { rewind() }
++
++        // Some devices expose plane buffers whose remaining() is smaller than
++        // rowStride * height (e.g. exactly rowStride*(height-1)+width-1). The
++        // naive loop below would then read one byte past the end and crash with
++        // IndexOutOfBoundsException (e.g. "index=153599 out of bounds
++        // (limit=153599)") on every frame, so detection never runs. Clamp every
++        // index to the last usable sample of each plane to stay inside the buffer.
++        val yLast = (yBuffer.remaining() - 1).coerceAtLeast(0)
++        val uLast = (uBuffer.remaining() - 1).coerceAtLeast(0)
++        val vLast = (vBuffer.remaining() - 1).coerceAtLeast(0)
++
++        val out = IntArray(width * height)
++        val uvHeight = height / 2
++
++        var i = 0
++        for (row in 0 until height) {
++            val yRowBase = row * yRowStride
++            val uvRow = (row / 2).coerceIn(0, uvHeight - 1)
++            val uvRowBase = uvRow * uvRowStride
++
++            for (col in 0 until width) {
++                val yIndex = minOf(yRowBase + col, yLast)
++                val y = (yBuffer.get(yIndex).toInt() and 0xff)
++
++                val uvIndex = minOf(uvRowBase + (col / 2) * uvPixelStride, uLast)
++
++                val vByte: Int
++                val uByte: Int
++                if (uvPixelStride == 2) {
++                    // Semi-planar interleaved: VU (NV21) no mesmo buffer.
++                    vByte = vBuffer.get(minOf(uvIndex, vLast)).toInt() and 0xff
++                    uByte = uBuffer.get(minOf(uvIndex + 1, uLast)).toInt() and 0xff
++                } else {
++                    // Planar: planos separados.
++                    uByte = uBuffer.get(uvIndex).toInt() and 0xff
++                    vByte = vBuffer.get(minOf(uvIndex, vLast)).toInt() and 0xff
++                }
++
++                val u = uByte - 128
++                val v = vByte - 128
++
++                val r = (y + 1.402f * v).toInt()
++                val g = (y - 0.34414f * u - 0.71414f * v).toInt()
++                val b = (y + 1.772f * u).toInt()
++
++                out[i++] = 0xff000000.toInt() or
++                    (r.coerceIn(0, 255) shl 16) or
++                    (g.coerceIn(0, 255) shl 8) or
++                    (b.coerceIn(0, 255))
++            }
++        }
++
++        return Bitmap.createBitmap(out, width, height, Bitmap.Config.ARGB_8888)
++    }
++
+     override fun callback(frame: Frame, params: Map<String, Any>?): Any? {
+         if (handLandmarker == null) {
+             Log.e(TAG, "HandLandmarker is null! Error: \$initError")
+@@ -240,7 +316,12 @@ ${poseInit}${faceInit}        } catch (e: Exception) {
+         var mpImage: MPImage? = null
+         try {
+             val mediaImage: Image = frame.image
+-            mpImage = MediaImageBuilder(mediaImage).build()
++
++            // MediaImageBuilder só aceita imagens com pixel format RGBA_8888.
++            // A câmera Android entrega frames em YUV_420_888, pelo que convertemos
++            // o frame para Bitmap ARGB_8888 e usamos BitmapImageBuilder.
++            val bitmap = frameToBitmap(mediaImage)
++            mpImage = BitmapImageBuilder(bitmap).build()
+ 
+             // A câmera Android entrega o buffer na orientação do sensor (geralmente
+             // deitado). Sem informar a rotação ao MediaPipe, a imagem chega "de lado"
