@@ -1,5 +1,4 @@
 """Design tokens and styles from IDENTIDADE_VISUAL.md."""
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QGraphicsDropShadowEffect
 
@@ -31,10 +30,11 @@ def init_gesture_colors():
         Gesture.ONE:       (QColor(80, 200, 255),  "MOVER 1D"),
         Gesture.PINCH:     (QColor(90, 220, 90),   "CLIQUE ESQ"),
         Gesture.PINCH_MID: (QColor(60, 60, 235),   "CLIQUE DIR"),
-        Gesture.FIST:      (QColor(70, 130, 255),  "ARRASTAR"),
-        Gesture.PEACE:     (QColor(255, 80, 200),  "SCROLL"),
+        Gesture.FIST:      (QColor(255, 80, 200),   "SCROLL"),
+        Gesture.PEACE:     (QColor(70, 130, 255),   "DOIS DEDOS"),
         Gesture.THREE:     (QColor(255, 170, 60),  "VOLUME"),
         Gesture.THUMB_UP:  (QColor(140, 225, 225), "PLAY/PAUSA"),
+        Gesture.THUMB_DOWN: (QColor(255, 120, 120), "DESLIKE"),
         Gesture.PINKY:     (QColor(180, 120, 255), "COPIAR"),
         Gesture.SHAKA:     (QColor(120, 200, 180), "COLAR"),
     }

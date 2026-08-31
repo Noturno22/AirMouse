@@ -1,6 +1,10 @@
 """Side menu panel: brand header + grouped action buttons."""
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame,
+    QFrame,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ui.brand import BrandHeader

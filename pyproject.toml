@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airmouse"
+version = "0.1.0"
+description = "Controla o cursor do PC por gestos da mao via webcam (Python + PySide6)"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools]
+packages = ["core", "ui"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+markers = ["slow: testes demorados (não correm no CI por omissão)"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [".venv", "build", "dist", "*.egg-info", "patches"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.10"
+exclude = [".venv", "build", "dist"]
+ignore_missing_imports = true
+check_untyped_defs = true

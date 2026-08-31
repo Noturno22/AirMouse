@@ -1,5 +1,5 @@
 """Centered timed toast notification."""
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation
+from PySide6.QtCore import QPropertyAnimation, Qt, QTimer
 from PySide6.QtWidgets import QLabel
 
 from ui.theme import FONT_MONO_BOLD

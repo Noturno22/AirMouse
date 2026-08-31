@@ -75,7 +75,7 @@ big = make_hand(0.7, 0.3, scale=0.35)
 picked = lock3.select([small, big], W, H)
 check("sem historico adquire a maior mao", picked == big)
 
-# 6. troca legitima: dono sai de vez, intruso entra perto do ultimo ponto? 
+# 6. troca legitima: dono sai de vez, intruso entra perto do ultimo ponto?
 #    intruso fora do raio -> graca; dono volta -> retoma
 lock4 = HandLock(radius_frac=0.20)
 owner = make_hand(0.4, 0.4)

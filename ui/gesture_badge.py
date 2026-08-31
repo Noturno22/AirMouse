@@ -2,7 +2,7 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel
 
-from ui.theme import TEXT_SECONDARY, FONT_BADGE, gesture_color, gesture_label
+from ui.theme import FONT_BADGE, TEXT_SECONDARY, gesture_color, gesture_label
 
 
 class GestureBadge(QLabel):

@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 try:
+    import io
+
     import cairosvg
     from PIL import Image
-    import io
 except ImportError:
     print("Instale as dependencias: pip install cairosvg Pillow")
     sys.exit(1)

@@ -56,7 +56,10 @@ def _thumb(curls):
 
 def synthesize(gesture, rng):
     skel = [None] * 21
-    jitter = lambda a=0.05: rng.uniform(-a, a)
+
+    def jitter(a=0.05):
+        return rng.uniform(-a, a)
+
     skel[0] = np.array(OPEN_SKELETON[0])
     skel[1] = np.array(OPEN_SKELETON[1]) + rng.uniform(-0.03, 0.03, 2)
 
@@ -135,6 +138,19 @@ def synthesize(gesture, rng):
             max(0.005 + jitter(0.02), 0.0),
         )
         th = _chain(base, np.deg2rad(-92.0), FINGER_LEN["thumb"], up_curls, THUMB_MAX)
+        skel[2], skel[3], skel[4] = th[1], th[2], th[3]
+    elif gesture == Gesture.THUMB_DOWN:
+        finger("index", 5, (0.94, 0.97, 0.92), jitter(0.05))
+        finger("middle", 9, (0.94, 0.97, 0.92), jitter(0.05))
+        finger("ring", 13, (0.94, 0.96, 0.9), jitter(0.05))
+        finger("pinky", 17, (0.95, 0.97, 0.9), jitter(0.05))
+        base = np.array([-0.32, -0.26]) + rng.uniform(-0.03, 0.03, 2)
+        down_curls = (
+            max(0.01 + jitter(0.03), 0.0),
+            max(0.01 + jitter(0.03), 0.0),
+            max(0.005 + jitter(0.02), 0.0),
+        )
+        th = _chain(base, np.deg2rad(92.0), FINGER_LEN["thumb"], down_curls, THUMB_MAX)
         skel[2], skel[3], skel[4] = th[1], th[2], th[3]
     else:
         raise ValueError(gesture)

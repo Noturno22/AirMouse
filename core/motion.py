@@ -67,20 +67,35 @@ class SmoothEmitter:
         period = self._period
         next_tick = time.perf_counter()
         while self._running:
+            # Espera o próximo instante de emissão sem deixar o temporizador
+            # "recuperar o atraso" em rajadas. Se a iteração demorar mais do que
+            # um período (ex.: um sleep/atraso do SO), ressincronizamos em vez de
+            # disparar N emissões seguidas — que era a causa de micro-tropeções e
+            # de movimento "aos solavancos" no cursor.
+            now = time.perf_counter()
+            if now < next_tick:
+                time.sleep(next_tick - now)
+                now = time.perf_counter()
+            if now >= next_tick + period:
+                next_tick = now
             next_tick += period
+
             ex = ey = 0.0
             with self._lock:
                 now = time.perf_counter()
                 idle = now - self._last_push > 2.5 * self._span
-                frac = min(period / self._span, 1.0)
-                ex = self._bx * frac
-                ey = self._by * frac
                 if idle:
-                    ex += self._bx
-                    ey += self._by
+                    # Flush final: emite EXATAMENTE o que falta. O bug anterior
+                    # somava bx*frac + bx (duplicava a fração) e violava a
+                    # conservação "nem perder nem duplicar pixels".
+                    ex = self._bx
+                    ey = self._by
                     self._bx = 0.0
                     self._by = 0.0
                 else:
+                    frac = min(self._period / self._span, 1.0)
+                    ex = self._bx * frac
+                    ey = self._by * frac
                     self._bx -= ex
                     self._by -= ey
                 self._accx += ex
@@ -95,9 +110,6 @@ class SmoothEmitter:
                     self._mouse.move_by(ix, iy)
                 except Exception:
                     pass
-            rest = next_tick - time.perf_counter()
-            if rest > 0:
-                time.sleep(rest)
 
 
 def lead_offset(vx, vy, predict_ms):

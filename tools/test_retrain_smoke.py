@@ -8,16 +8,14 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+from core.gesture_ai import CLASSES, N_CLASSES, GestureAI
 from tools.train_gesture_ai import (
-    LABEL_NAMES,
     _to_feature,
     load_real,
     split_real,
     synthesize,
     train,
 )
-from core.gesture_ai import CLASSES, N_CLASSES, GestureAI
-from core.gestures import Gesture
 
 passed, failed = 0, 0
 

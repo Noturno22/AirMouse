@@ -3,7 +3,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QLabel
 
-from ui.theme import TEXT_SECONDARY, FONT_MONO
+from ui.theme import FONT_MONO, TEXT_SECONDARY
 
 
 class VoiceBar(QLabel):

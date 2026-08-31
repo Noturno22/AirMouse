@@ -1,7 +1,69 @@
 import ctypes
+import os
 import time
+from ctypes import wintypes
 
 from pynput.mouse import Button, Controller
+
+# ── Win32 SendInput (botões do rato) ─────────────────────────────────
+# O despacho de cliques via SendInput é determinístico e sub-ms, sem o
+# overhead do pynput. Em plataformas sem user32 o código cai no pynput.
+_IS_WINDOWS = os.name == "nt"
+
+INPUT_MOUSE = 0
+
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_RIGHTDOWN = 0x0008
+MOUSEEVENTF_RIGHTUP = 0x0010
+
+ULONG_PTR = (
+    ctypes.c_ulong if ctypes.sizeof(ctypes.c_void_p) == 4 else ctypes.c_ulonglong
+)
+
+
+class _MOUSEINPUT(ctypes.Structure):
+    _fields_ = [
+        ("dx", wintypes.LONG),
+        ("dy", wintypes.LONG),
+        ("mouseData", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ULONG_PTR),
+    ]
+
+
+class _INPUTUNION(ctypes.Union):
+    _fields_ = [("mi", _MOUSEINPUT)]
+
+
+class _INPUT(ctypes.Structure):
+    _fields_ = [("type", wintypes.DWORD), ("union", _INPUTUNION)]
+
+
+def build_mouse_input(flags, data=0):
+    """Constrói uma struct INPUT para um evento de rato (puro, sem enviar)."""
+    inp = _INPUT()
+    inp.type = INPUT_MOUSE
+    inp.union.mi = _MOUSEINPUT(0, 0, int(data) & 0xFFFFFFFF, flags, 0, 0)
+    return inp
+
+
+def send_mouse_input(inp):
+    """Envia uma struct INPUT via SendInput. Apenas Windows."""
+    sent = ctypes.windll.user32.SendInput(
+        1, ctypes.byref(inp), ctypes.sizeof(_INPUT)
+    )
+    return sent == 1
+
+
+def sendinput_available():
+    if not _IS_WINDOWS:
+        return False
+    try:
+        return callable(ctypes.windll.user32.SendInput)
+    except Exception:
+        return False
 
 
 class MouseCtl:
@@ -12,6 +74,7 @@ class MouseCtl:
         self._scroll_acc = 0.0
         self._frac_x = 0.0
         self._frac_y = 0.0
+        self._sendinput = sendinput_available()
 
     @staticmethod
     def _enable_dpi_awareness():
@@ -34,6 +97,21 @@ class MouseCtl:
         except Exception:
             return (1920, 1080)
 
+    def _send_down(self, flags):
+        if self._sendinput:
+            send_mouse_input(build_mouse_input(flags))
+        else:
+            self.mouse.press(Button.left)
+
+    def _send_up(self, flags):
+        if self._sendinput:
+            send_mouse_input(build_mouse_input(flags))
+        else:
+            try:
+                self.mouse.release(Button.left)
+            except Exception:
+                pass
+
     def move_by(self, dx, dy):
         self._frac_x += dx
         self._frac_y += dy
@@ -49,21 +127,23 @@ class MouseCtl:
         self.mouse.position = (int(nx), int(ny))
 
     def left_click(self):
-        self.mouse.click(Button.left, 1)
+        self.press_left()
+        self.release_left()
 
     def right_click(self):
-        self.mouse.press(Button.right)
-        time.sleep(0.02)
-        self.mouse.release(Button.right)
+        if self._sendinput:
+            send_mouse_input(build_mouse_input(MOUSEEVENTF_RIGHTDOWN))
+            send_mouse_input(build_mouse_input(MOUSEEVENTF_RIGHTUP))
+        else:
+            self.mouse.press(Button.right)
+            time.sleep(0.02)
+            self.mouse.release(Button.right)
 
     def press_left(self):
-        self.mouse.press(Button.left)
+        self._send_down(MOUSEEVENTF_LEFTDOWN)
 
     def release_left(self):
-        try:
-            self.mouse.release(Button.left)
-        except Exception:
-            pass
+        self._send_up(MOUSEEVENTF_LEFTUP)
 
     def scroll(self, dy):
         self._scroll_acc += dy

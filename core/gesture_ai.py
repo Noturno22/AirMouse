@@ -1,6 +1,5 @@
 import os
 import urllib.request
-import zipfile
 
 import numpy as np
 

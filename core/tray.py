@@ -1,7 +1,7 @@
 import threading
 
-from PIL import Image, ImageDraw
 import pystray
+from PIL import Image, ImageDraw
 
 
 def _build_icon_image(active=True):

@@ -186,7 +186,6 @@ class HandPool:
     """Uma GestureEngine por mao (esquerda/direita), com reset individual."""
 
     def __init__(self, cfg, gesture_ai=None):
-        from core.gestures import GestureEngine
 
         self.engines = {
             "Left": GestureEngine(cfg, gesture_ai),
@@ -461,12 +460,15 @@ class LeftHandDetector:
     A mao direita continua responsavel por mover o cursor/arrastar. A mao
     esquerda, por sua vez, funciona como uma "mao de comandos":
 
-      * SWIPE horizontal (esq/dir) -> Alt+Tab / Alt+Shift+Tab (solta logo);
+      * SWIPE horizontal (esq/dir) -> troca rapida de janela (solta logo);
+      * Segurar a mao ABERTA ~2s  -> abre o alternador de janelas (pick mode);
+        enquanto ativo, os swipes navegam sem soltar (confirmar = soltar a mao);
       * DESLIZAR para cima/baixo   -> scroll (movimento vertical continuo).
 
     Retorna um evento por chamada a update():
-      ('alt_tab_forward', None)  swipe para a direita
-      ('alt_tab_back', None)  swipe para a esquerda
+      ('alt_tab_forward', None)  swipe para a direita (troca rapida)
+      ('alt_tab_back', None)  swipe para a esquerda (troca rapida)
+      ('alt_switch_open', None)  mao aberta mantida Ns (abre alternador)
       ('scroll', value)  valor acumulado de scroll vertical
     """
 
@@ -479,9 +481,21 @@ class LeftHandDetector:
         self._scroll_prev_y = None
         self._scroll_acc = 0.0
         self._swipe_until = 0.0
+        # Contagem de "abrir/fechar" (OPEN <-> FIST) sempre neste estado:
+        # _pump_state guarda o estado de gesto aceite como transicao anterior.
+        self._pump_state = None
+        self._pump_count = 0
+        self._pump_until = 0.0
+        # "Pick mode" (escolher janela): mao esquerda aberta e mantida durante
+        # alguns segundos abre o alternador de janelas. Enquanto o pick mode
+        # estiver ativo, os swipes navegam sem soltar o Alt.
+        self._open_since = None
+        self._switcher_open = False
 
-    def update(self, palm, now):
-        """palm: (x, y) em px, ou None se a mao esquerda nao estiver visivel."""
+    def update(self, palm, now, gesture=None):
+        """palm: (x, y) em px, ou None se a mao esquerda nao estiver visivel.
+        gesture: opcional (Gesture) da mao esquerda, usado para o gesto de
+        abrir/fechar 3x que mostra/oculta a interface."""
         cfg = self.cfg
         if palm is None:
             self.reset()
@@ -493,6 +507,39 @@ class LeftHandDetector:
 
         ev = None
         val = None
+
+        # Abrir/fechar a mao 3x (OPEN <-> FIST repetidamente) -> gui_toggle.
+        # Cada alternancia conta uma transicao; precisamos de 3 num janela.
+        if gesture is not None:
+            if gesture in (Gesture.OPEN, Gesture.FIST):
+                if self._pump_state is not None and gesture != self._pump_state:
+                    self._pump_count += 1
+                    self._pump_state = gesture
+                    self._pump_until = now + cfg.left_hand_swipe_window_s
+                    if self._pump_count >= cfg.left_hand_gui_toggle_cycles:
+                        ev = "gui_toggle"
+                        self._pump_count = 0
+                        self._pump_state = None
+                        return ev, None
+                elif self._pump_state is None:
+                    self._pump_state = gesture
+            elif now >= self._pump_until:
+                self._pump_state = None
+                self._pump_count = 0
+
+        # Pick mode: segurar a mao ABERTA durante N segundos abre o alternador.
+        # Apos disparar, mantem-se ativo enquanto a mao continuar aberta; os
+        # swipes seguintes navegam no alternador sem soltar (handled em main).
+        if gesture == Gesture.OPEN:
+            if self._open_since is None:
+                self._open_since = now
+            elif not self._switcher_open and now - self._open_since >= cfg.left_hand_open_switch_s:
+                self._switcher_open = True
+                self._swipe_until = now + cfg.left_hand_cooldown_s
+                return "alt_switch_open", None
+        else:
+            self._open_since = None
+            self._switcher_open = False
 
         # SWIPE horizontal: deslocamento X dominante e rapido dentro da janela
         if now >= self._swipe_until and len(self._samples) >= 3:
@@ -523,3 +570,14 @@ class LeftHandDetector:
                 self._scroll_acc = 0.0
 
         return ev, val
+
+    @property
+    def pumping_until(self):
+        """Timestamp ate ao qual o gesto de abrir/fechar (pump) esta a decorrer.
+
+        Usado para suprimir o gesto de fechar janela (punho -> Alt+F4) durante
+        os estados FIST transitorios que fazem parte do pump (abrir/fechar a
+        mao 3x = mostrar/ocultar interface). Fora de um pump devolve 0,
+        pelo que o punho solto continua a fechar a janela normalmente.
+        """
+        return self._pump_until

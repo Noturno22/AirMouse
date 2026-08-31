@@ -4,9 +4,11 @@ mao simulada, para apanhar bugs de desempacotamento (ex.: QPoint nao iteravel).
 Antes este teste nao existia -> o bug so rebentava com camera real.
 """
 import os
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from PySide6.QtWidgets import QApplication

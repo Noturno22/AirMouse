@@ -44,7 +44,7 @@ def ensure_model(path, url, timeout_s=15.0):
 
 
 class HandTracker:
-    def __init__(self, model_path, num_hands=1, use_gpu=False):
+    def __init__(self, model_path, num_hands=1, use_gpu=False, num_threads=-1):
         self._landmarker = None
         num_hands = max(1, min(int(num_hands), 2))
         if use_gpu:

@@ -1,9 +1,7 @@
-import io
 import os
 import queue
 import tempfile
 import threading
-import time
 import urllib.request
 import wave
 

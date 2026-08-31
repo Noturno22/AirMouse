@@ -5,30 +5,27 @@ movimento/gestos vive em ``process_frame``/``make_engine_ctx`` (main.py),
 partilhada com o preview OpenCV. Isto garante paridade total de comportamento
 entre as duas UIs.
 """
-import json
-import os
 import time
 
 import cv2
-
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QPainter, QPen
-from PySide6.QtWidgets import QMainWindow, QWidget, QLabel, QHBoxLayout
+from PySide6.QtWidgets import QLabel, QMainWindow, QWidget
 
-from config import Config
-from ui.theme import (
-    MAIN_STYLESHEET, TEXT_PRIMARY, FONT_MONO, FONT_STATUS,
-    init_gesture_colors, gesture_color, gesture_label,
-)
+from config import SMOOTH_PRESETS, save_settings
+from core.gestures import Gesture
 from ui.camera_view import CameraView
 from ui.gesture_badge import GestureBadge
-from ui.status_indicators import StatusBadges
-from ui.voice_bar import VoiceBar
-from ui.toast import Toast
 from ui.help_panel import HelpPanel
 from ui.menu_panel import MenuPanel
-
-from core.gestures import Gesture
+from ui.status_indicators import StatusBadges
+from ui.theme import (
+    FONT_MONO,
+    FONT_STATUS,
+    MAIN_STYLESHEET,
+    init_gesture_colors,
+)
+from ui.toast import Toast
+from ui.voice_bar import VoiceBar
 
 
 class MainWindow(QMainWindow):
@@ -63,9 +60,11 @@ class MainWindow(QMainWindow):
         self._fps_counter = 0
         self._fps_time = time.perf_counter()
 
-        # A câmara é o conteúdo principal da janela (semelhante ao preview original):
-        # aparece de imediato; o rastreio de gestos corre sempre em segundo plano.
-        self._camera_on = True
+        # A câmara serve APENAS para configuração/verificação: não é o fundo da
+        # janela nem interfere com o reconhecimento de gestos. O feed só aparece
+        # quando o utilizador ativa "VER CÂMERA" no menu. O rastreio de gestos
+        # continua sempre a correr em segundo plano.
+        self._camera_on = False
 
         self._E = None
         self._ctx = None
@@ -102,8 +101,7 @@ class MainWindow(QMainWindow):
 
         self._cam_view = CameraView(central)
         self._cam_view.setObjectName("CameraPreview")
-        self._cam_view.show()
-        self._brand.hide()
+        self._cam_view.hide()
 
         self._gesture_badge = GestureBadge(central)
         self._gesture_badge.move(12, 10)
@@ -148,8 +146,6 @@ class MainWindow(QMainWindow):
         m.btn_help.toggled.connect(self._toggle_help)
         m.btn_config.clicked.connect(self._open_settings)
         m.btn_quit.clicked.connect(self.close)
-        if self._camera_on:
-            m.btn_camera.setChecked(True)
         self._menu_buttons = [
             m.btn_pause, m.btn_save, m.btn_voice, m.btn_snap,
             m.btn_camera, m.btn_help, m.btn_config, m.btn_quit,
@@ -159,20 +155,33 @@ class MainWindow(QMainWindow):
         pass
 
     def _menu_checkable(self, btn, checked):
+        """Sincroniza o estado do botão SEM disparar o sinal toggled (que
+        dispararia os handlers e reverteria o estado do motor)."""
+        btn.blockSignals(True)
         btn.setChecked(checked)
+        btn.blockSignals(False)
 
     def _toggle_pause(self):
-        self._paused = not self._paused
-        self._menu.btn_pause.setText("⏸  PAUSA" if not self._paused else "▶  RETOMAR")
-        self._toast.show_toast("PAUSA" if self._paused else "RETOMAR")
+        """Pausa/retoma CONTROLANDO o motor: o estado vive em ``state["paused"]``
+        (lido por process_frame), não numa flag local da janela."""
+        paused = not self._state.get("paused", False)
+        if self._E is not None and self._E.emitter is not None:
+            self._E.emitter.clear()
+        self._state["paused"] = paused
+        self._paused = paused
+        self._menu.btn_pause.setText("⏸  PAUSA" if not paused else "▶  RETOMAR")
+        self._toast.show_toast("PAUSA" if paused else "RETOMAR")
 
     def _toggle_voice(self, checked):
         if self._voice:
             self._voice.toggle()
-            self._toast.show_toast(f"VOZ {'ON' if checked else 'OFF'}")
+            on = self._voice.status != "off"
+            self._menu_checkable(self._menu.btn_voice, on)
+            self._toast.show_toast(f"VOZ {'ON' if on else 'OFF'}")
 
     def _toggle_snap(self, checked):
         if self._snap and self._snap.available:
+            self._snap.enabled = checked
             self._cfg.snap_enabled = checked
             self._toast.show_toast(f"SNAP {'ON' if checked else 'OFF'}")
 
@@ -199,8 +208,7 @@ class MainWindow(QMainWindow):
         if key in (Qt.Key_Q, Qt.Key_Escape):
             self.close()
         elif key == Qt.Key_Space:
-            self._paused = not self._paused
-            self._toast.show_toast("PAUSA" if self._paused else "RETOMAR")
+            self._toggle_pause()
         elif key in (Qt.Key_H, Qt.Key_F1):
             self._show_help = not self._show_help
             self._help.toggle()
@@ -211,12 +219,14 @@ class MainWindow(QMainWindow):
             if self._tuner:
                 self._toast.show_toast(self._tuner.toggle())
         elif key == Qt.Key_V:
-            if self._voice:
-                self._voice.toggle()
+            self._toggle_voice(None)
         elif key == Qt.Key_M:
             if self._snap and self._snap.available:
-                self._cfg.snap_enabled = not self._cfg.snap_enabled
-                self._toast.show_toast(f"SNAP {'ON' if self._cfg.snap_enabled else 'OFF'}")
+                new_state = not self._snap.enabled
+                self._snap.enabled = new_state
+                self._cfg.snap_enabled = new_state
+                self._menu_checkable(self._menu.btn_snap, new_state)
+                self._toast.show_toast(f"SNAP {'ON' if new_state else 'OFF'}")
         elif key == Qt.Key_C:
             new_state = not self._camera_on
             self._menu.btn_camera.setChecked(new_state)
@@ -241,7 +251,7 @@ class MainWindow(QMainWindow):
             super().keyPressEvent(event)
 
     def _step_smooth(self, direction):
-        presets = [("SUAVE", 0.9, 0.02), ("NORMAL", 1.4, 0.028), ("REACTIVO", 2.2, 0.05)]
+        presets = SMOOTH_PRESETS
         cur = next((i for i, (n, _, _) in enumerate(presets) if n == self._smooth_name), 1)
         idx = (cur + direction) % len(presets)
         name, cut, beta = presets[idx]
@@ -274,7 +284,6 @@ class MainWindow(QMainWindow):
         self._toast.move((w - tw) // 2, 50)
 
         bw = self._menu.width()
-        mw = self._menu.sizeHint() if hasattr(self._menu, "sizeHint") else None
         mh = self._menu.sizeHint().height()
         x = w - bw - 10
         y = 10
@@ -300,11 +309,11 @@ class MainWindow(QMainWindow):
 
     # ── Processing Loop ─────────────────────────────────────────────
     def _tick(self):
-        from main import process_frame, make_engine_ctx
+        from core.commands import AppCtl
+        from core.engine import make_engine_ctx, process_frame
         from core.motion import SmoothEmitter
 
         if self._ctx is None:
-            from main import AppCtl
             self._ctx = AppCtl()
         if self._E is None:
             self._E = make_engine_ctx(self._cfg, -1, self._gesture_ai, self._tuner, self._ctx)
@@ -380,7 +389,19 @@ class MainWindow(QMainWindow):
         self._sync_toolbar()
 
         gesture = hand_frame.gesture if hand_frame else Gesture.NONE
-        self._gesture_badge.update_gesture(gesture, self._paused)
+
+        # O motor pode pausar/retomar por voz (apply_command). Refletir esse
+        # estado no badge/botão da janela.
+        engine_paused = bool(self._state.get("paused", self._paused))
+        if engine_paused != self._paused:
+            self._paused = engine_paused
+            if self._menu.btn_pause.text() != (
+                "⏸  PAUSA" if not engine_paused else "▶  RETOMAR"
+            ):
+                self._menu.btn_pause.setText(
+                    "⏸  PAUSA" if not engine_paused else "▶  RETOMAR"
+                )
+        self._gesture_badge.update_gesture(gesture, engine_paused)
         if self._camera_on:
             self._cam_view.update_frame(frame, all_frames, active_side, self._flash)
 
@@ -417,7 +438,7 @@ class MainWindow(QMainWindow):
                 "cmd": Key.cmd, "tab": Key.tab,
             }
             parts = combo.lower().split("+")
-            keys = [key_map.get(p.strip(), p.strip()) for p in parts]
+            keys = [key_map[p.strip()] if p.strip() in key_map else p.strip() for p in parts]
             for k in keys:
                 kb.press(k)
             for k in reversed(keys):
@@ -448,29 +469,7 @@ class MainWindow(QMainWindow):
         return None
 
     def _save_settings(self):
-        import json
-        import os
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "settings.json")
-        try:
-            with open(path, "w", encoding="utf-8") as fh:
-                json.dump({
-                    "move_gain": round(self._cfg.move_gain, 2),
-                    "suavidade": self._smooth_name,
-                    "filter_min_cutoff": round(self._cfg.filter_min_cutoff, 3),
-                    "filter_beta": round(self._cfg.filter_beta, 4),
-                    "snap_enabled": bool(self._cfg.snap_enabled),
-                    "mirror": bool(self._cfg.mirror),
-                    "left_hand_commands": bool(self._cfg.left_hand_commands),
-                    "low_light_boost": bool(self._cfg.low_light_boost),
-                    "deadzone_px": round(self._cfg.deadzone_px, 1),
-                    "gesture_stable_frames": int(self._cfg.gesture_stable_frames),
-                    "voice_enabled": bool(self._cfg.voice_enabled),
-                    "tts_enabled": bool(self._cfg.tts_enabled),
-                    "ai_enabled": bool(self._cfg.ai_enabled),
-                    "autotune_enabled": bool(self._cfg.autotune_enabled),
-                }, fh, indent=2)
-        except Exception as exc:
-            print(f"ERRO ao gravar: {exc}")
+        save_settings(self._cfg, self._smooth_name)
 
     def closeEvent(self, event):
         self._timer.stop()

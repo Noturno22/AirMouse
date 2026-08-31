@@ -64,7 +64,7 @@ def _load_api_key(name, env_files=(".env",)):
         if not os.path.isfile(ef):
             continue
         try:
-            with open(ef, "r", encoding="utf-8") as fh:
+            with open(ef, encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
                     if not line or line.startswith("#") or "=" not in line:

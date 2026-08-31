@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,8 +9,9 @@ import {
   StatusBar,
   NativeModules,
 } from 'react-native';
-import { Camera, useCameraDevice, useFrameProcessor, useCameraPermission } from 'react-native-vision-camera';
+import { Camera, useCameraDevice, useFrameProcessor, useCameraPermission, VisionCameraProxy } from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
+import type { HandDetectionResult } from 'expo-vision-camera-v4-mediapipe';
 import { useGestures } from './src/hooks/useGestures';
 import { useSettingsStore, useGestureStore } from './src/store';
 import { GESTURE_LABELS, GESTURE_COLORS, HAND_CONNECTIONS } from './src/constants';
@@ -22,20 +23,25 @@ const { TouchController, KeyboardController, SystemController } = NativeModules;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Hand detection via MediaPipe (will be replaced with real implementation)
-let detectHandLandmarks: any = null;
-try {
-  detectHandLandmarks = require('expo-vision-camera-v4-mediapipe').detectHandLandmarks;
-} catch (e) {
-  console.log('MediaPipe not available, using simulated detection');
-}
-
 export default function App() {
-  const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
+const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-  
+  const [frameDims, setFrameDims] = useState<{ w: number; h: number } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<{
+    plugin: boolean;
+    hands: number;
+    error?: string | null;
+  } | null>(null);
+
   const device = useCameraDevice('front');
   const { hasPermission, requestPermission } = useCameraPermission();
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  const detectHandLandmarks = useMemo(
+    () => VisionCameraProxy.initFrameProcessorPlugin('handLandmarker', {}),
+    []
+  );
+  const hasPlugin = detectHandLandmarks != null;
 
   const {
     currentGesture,
@@ -64,38 +70,47 @@ export default function App() {
 
   // Process hand detection result
   const processHands = useCallback(
-    (hands: any[], handedness: any[]) => {
+    (hands: any[], handedness: any[], imgW: number, imgH: number) => {
       if (!engineRef.current || !filtersRef.current || !curveRef.current) return;
+      if (imgW <= 0 || imgH <= 0) return;
 
-      const engine = engineRef.current;
-      const filters = filtersRef.current;
+      try {
+        const engine = engineRef.current;
+        const filters = filtersRef.current;
 
-      for (let i = 0; i < hands.length; i++) {
-        const handLandmarks = hands[i];
-        
-        // Convert to our format
-        const points: [number, number, number][] = handLandmarks.map(
-          (point: any) => [point.x, point.y, point.z]
-        );
+        for (let i = 0; i < hands.length; i++) {
+          const handLandmarks = hands[i];
 
-        // Process with gesture engine (normalized coordinates)
-        const result = engine.update(points, 1.0, 1.0);
+          // Convert to our format
+          const points: [number, number, number][] = handLandmarks.map(
+            (point: any) => [point.x, point.y, point.z]
+          );
 
-        // Apply filters
-        const [fx, fy] = filters.filter(
-          result.landmarks.palmCenter[0],
-          result.landmarks.palmCenter[1]
-        );
+          // Process with gesture engine in image pixels so scale thresholds apply
+          const result = engine.update(points, imgW, imgH);
 
-        // Update state
-        setGesture(result.landmarks.gesture);
-        incrementGestureCount();
-        setLandmarks(result.landmarks);
+          // Apply filters
+          const [fx, fy] = filters.filter(
+            result.landmarks.palmCenter[0],
+            result.landmarks.palmCenter[1]
+          );
 
-        // Handle actions via native modules
-        if (result.event && TouchController && SystemController) {
-          handleAction(result.event, result.value);
+          // Update state
+          setGesture(result.landmarks.gesture);
+          incrementGestureCount();
+          setLandmarks(result.landmarks);
+
+          // Handle actions via native modules
+          if (result.event && TouchController && SystemController) {
+            handleAction(result.event, result.value);
+          }
         }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setDebugInfo((prev) =>
+          prev && prev.error === msg ? prev : { plugin: true, hands: 0, error: `JS: ${msg}` }
+        );
+        console.error('processHands error:', e);
       }
     },
     [setGesture, incrementGestureCount]
@@ -187,35 +202,145 @@ export default function App() {
     })
   );
 
+  const emptyFrames = useRef(0);
+  const clearAfterEmptyFrames = 6;
+
+  const handleFramePayload = useCallback(
+    (payload: {
+      hands?: any[];
+      handedness?: any[];
+      imgW: number;
+      imgH: number;
+      handsCount: number;
+    }) => {
+      if (payload.handsCount > 0 && payload.hands && payload.hands.length > 0) {
+        emptyFrames.current = 0;
+        setFrameDims((prev) =>
+          prev && prev.w === payload.imgW && prev.h === payload.imgH
+            ? prev
+            : { w: payload.imgW, h: payload.imgH }
+        );
+        processHands(payload.hands, payload.handedness || [], payload.imgW, payload.imgH);
+      } else {
+        emptyFrames.current += 1;
+        if (emptyFrames.current >= clearAfterEmptyFrames) {
+          setLandmarks(null);
+        }
+      }
+    },
+    [processHands]
+  );
+
+  const framePayloadRef = useRef(handleFramePayload);
+  useEffect(() => {
+    framePayloadRef.current = handleFramePayload;
+  }, [handleFramePayload]);
+
+  const bridgeFrame = useRef(
+    Worklets.createRunOnJS(
+      (payload: {
+        hands?: any[];
+        handedness?: any[];
+        imgW: number;
+        imgH: number;
+        handsCount: number;
+      }) => {
+        framePayloadRef.current(payload);
+      }
+    )
+  );
+
+  const updateDebug = useRef(
+    Worklets.createRunOnJS(
+      (info: { plugin: boolean; hands: number; error?: string | null }) => {
+        setDebugInfo((prev) => {
+          if (
+            prev &&
+            prev.plugin === info.plugin &&
+            prev.hands === info.hands &&
+            prev.error === info.error
+          ) {
+            return prev;
+          }
+          return info;
+        });
+      }
+    )
+  );
+
   // Frame processor for real-time hand detection
   const frameProcessor = useFrameProcessor(
     (frame) => {
       'worklet';
 
-      if (detectHandLandmarks) {
-        const result = detectHandLandmarks(frame);
-        if (result?.hands && result.hands.length > 0) {
-          // Bridge to JS thread
-          const onResult = Worklets.createRunOnJS(
-            (hands: any[], handedness: any[]) => {
-              processHands(hands, handedness);
-            }
-          );
-          onResult(result.hands, result.handedness || []);
-        }
+      // Read frame dimensions BEFORE the slow MediaPipe call, while the frame is
+      // guaranteed valid. Accessing frame props after heavy native work can throw
+      // FrameInvalidError, and reading them first is the documented safe pattern.
+      const imgW = frame.width;
+      const imgH = frame.height;
+
+      let hands: any[] | undefined;
+      let handedness: any[] | undefined;
+      let handsCount = 0;
+      let errorMsg: string | null = null;
+
+      try {
+        const result = detectHandLandmarks?.call(frame) as HandDetectionResult | undefined;
+        hands = result?.hands;
+        handedness = result?.handedness;
+        handsCount = result?.hands?.length ?? 0;
+        errorMsg = result?.error ?? null;
+      } catch (e: any) {
+        errorMsg = e?.message ? String(e.message) : 'Frame processor error';
       }
+
+      bridgeFrame.current({
+        hands,
+        handedness,
+        imgW,
+        imgH,
+        handsCount,
+      });
+
+      updateDebug.current({ plugin: hasPlugin, hands: handsCount, error: errorMsg });
 
       // Update FPS on the JS thread
       updateFps.current();
     },
-    [processHands]
+    [detectHandLandmarks, hasPlugin]
   );
+
+  const viewMapping = useMemo(() => {
+    if (!frameDims) return null;
+    const scale = Math.max(SCREEN_WIDTH / frameDims.w, SCREEN_HEIGHT / frameDims.h);
+    const dispW = frameDims.w * scale;
+    const dispH = frameDims.h * scale;
+    return {
+      ox: (SCREEN_WIDTH - dispW) / 2,
+      oy: (SCREEN_HEIGHT - dispH) / 2,
+      dispW,
+      dispH,
+    };
+  }, [frameDims]);
 
   // Render hand overlay
   const renderHandOverlay = () => {
     if (!landmarks) return null;
 
     const color = GESTURE_COLORS[landmarks.gesture] || '#969696';
+
+    const mapX = (nx: number) =>
+      viewMapping ? viewMapping.ox + (1 - nx) * viewMapping.dispW : nx * SCREEN_WIDTH;
+    const mapY = (ny: number) =>
+      viewMapping ? viewMapping.oy + ny * viewMapping.dispH : ny * SCREEN_HEIGHT;
+    const toScreenX = (ix: number) =>
+      viewMapping && frameDims
+        ? viewMapping.ox + viewMapping.dispW - (viewMapping.dispW / frameDims.w) * ix
+        : ix;
+    const toScreenY = (iy: number) =>
+      viewMapping && frameDims
+        ? viewMapping.oy + (viewMapping.dispH / frameDims.h) * iy
+        : iy;
 
     return (
       <View style={styles.overlay}>
@@ -225,10 +350,10 @@ export default function App() {
           const pb = landmarks.points[b];
           if (!pa || !pb) return null;
 
-          const x1 = pa[0] * SCREEN_WIDTH;
-          const y1 = pa[1] * SCREEN_HEIGHT;
-          const x2 = pb[0] * SCREEN_WIDTH;
-          const y2 = pb[1] * SCREEN_HEIGHT;
+          const x1 = mapX(pa[0]);
+          const y1 = mapY(pa[1]);
+          const x2 = mapX(pb[0]);
+          const y2 = mapY(pb[1]);
 
           return (
             <View
@@ -256,8 +381,8 @@ export default function App() {
           style={[
             styles.palmCenter,
             {
-              left: landmarks.palmCenterPx[0] - 15,
-              top: landmarks.palmCenterPx[1] - 15,
+              left: toScreenX(landmarks.palmCenterPx[0]) - 15,
+              top: toScreenY(landmarks.palmCenterPx[1]) - 15,
               borderColor: color,
             },
           ]}
@@ -272,6 +397,19 @@ export default function App() {
       </View>
     );
   };
+
+  if (cameraError) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Text style={styles.permissionText}>Câmara indisponível</Text>
+        <Text style={[styles.permissionText, { fontSize: 14 }]}>{cameraError}</Text>
+        <Text style={[styles.permissionText, { fontSize: 14 }]}>
+          A câmara está restrita pelo sistema (política de dispositivo ou
+          restrição parental). Ative-a em Definições e reinicie a app.
+        </Text>
+      </View>
+    );
+  }
 
   if (!hasPermission) {
     return (
@@ -294,13 +432,26 @@ export default function App() {
         <Camera
           style={StyleSheet.absoluteFill}
           device={device}
-          isActive={true}
+          isActive={!cameraError}
           frameProcessor={frameProcessor}
-          pixelFormat="rgb"
+          onError={(error) => {
+            console.error('Camera error:', error.message);
+            setCameraError(error.message);
+          }}
         />
       )}
 
       {renderHandOverlay()}
+
+      {/* Debug overlay */}
+      {debugInfo && (
+        <View style={styles.debugOverlay}>
+          <Text style={styles.debugText}>
+            plugin:{debugInfo.plugin ? 'Y' : 'N'} hands:{debugInfo.hands}
+            {debugInfo.error ? ` err:${debugInfo.error}` : ''}
+          </Text>
+        </View>
+      )}
 
       {/* Top bar */}
       <View style={styles.topBar}>
@@ -426,6 +577,20 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     marginLeft: 8,
+  },
+  debugOverlay: {
+    position: 'absolute',
+    bottom: 110,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  debugText: {
+    color: '#FFE066',
+    fontSize: 13,
   },
   bottomBar: {
     position: 'absolute',

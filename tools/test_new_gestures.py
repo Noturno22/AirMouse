@@ -93,6 +93,23 @@ feed(eng, skel_hold, 5)
 held, _ = feed(eng, skel_hold, 12)
 check("segurar nao repete play_pause", all(e != "play_pause" for e, _ in held))
 
+# 2b. THUMB_DOWN ("deslike") classifica e nunca emite play_pause
+ok_td = True
+for t in range(12):
+    r = np.random.default_rng(400 + t)
+    skel_td = synthesize(Gesture.THUMB_DOWN, r) * PX_SCALE
+    eng = GestureEngine(cfg, None)
+    evs, committed = feed(eng, skel_td, 8)
+    if committed != Gesture.THUMB_DOWN or any(e == "play_pause" for e, _ in evs):
+        ok_td = False
+        print(f"  deslike virou {committed} na amostra {t}")
+check("THUMB_DOWN classifica + nao toca play_pause (12 seeds)", ok_td)
+skel_tu5 = synthesize(Gesture.THUMB_UP, np.random.default_rng(9)) * PX_SCALE
+eng = GestureEngine(cfg, None)
+feed(eng, skel_tu5, 5)
+up_evs, up_last = feed(eng, skel_tu5, 4)
+check("THUMB_UP nao confundido com deslike", up_last == Gesture.THUMB_UP, str(up_last))
+
 # 3. FIST nunca e confundido com THUMB_UP (polegar junto ao punho)
 ok_fist = True
 for t in range(12):

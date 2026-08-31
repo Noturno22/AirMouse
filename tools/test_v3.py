@@ -1,4 +1,3 @@
-import math
 import sys
 import time
 
@@ -46,10 +45,13 @@ def t_emitter_conservation():
         total_x += dx
         total_y += dy
         time.sleep(0.006)
-    deadline = time.time() + 1.5
+    # Espera terminantemente o flush do pendente. Depois do último push, o
+    # ramo idle do emissor descarrega tudo de uma vez; um deadline generoso
+    # apenas protege contra máquina lenta/sobrecarga sem afetar a asserção.
+    deadline = time.time() + 5.0
     while time.time() < deadline and em.pending > 0.5:
         time.sleep(0.02)
-    time.sleep(0.05)
+    time.sleep(0.1)
     em.stop()
     ex = sum(m[0] for m in fm.moves)
     ey = sum(m[1] for m in fm.moves)
@@ -92,13 +94,12 @@ def t_accel_expo():
     )
     c0 = AccelCurve(1.2, 3.0, 1400.0, expo=0.0)
     gm0 = c0.apply(700.0, 0.0)
-    expected = 1.2 + 1.8 * ((0.5 * 0.5 * (3 - 1.0)))
+    expected = 1.2 + 1.8 * (0.5 * 0.5 * (3 - 1.0))
     check("accel smoothstep legacy", abs(gm0 - expected) < 1e-6, f"{gm0:.3f}")
 
 
 def t_mouse_fractional():
     mc = MouseCtl.__new__(MouseCtl)
-    from pynput.mouse import Controller as PC
 
     class Rec:
         def __init__(self):
@@ -135,10 +136,8 @@ def t_magnifier():
     m = MagnifierCtl(step_frac=0.85)
     launches = []
     m._launch_magnifier = lambda: launches.append(1) or True
-    from pynput.keyboard import Key
 
     presses = []
-    orig_kb = m.kb
 
     class RecKB:
         def press(self, k):
@@ -149,9 +148,8 @@ def t_magnifier():
 
     m.kb = RecKB()
     now = time.perf_counter()
-    note = None
     for i in range(6):
-        note = m.update(
+        m.update(
             [
                 (Gesture.OPEN, (300.0, 300.0), 100.0),
                 (Gesture.OPEN, (520.0, 300.0), 100.0),

@@ -1,17 +1,19 @@
 """Settings dialog for real-time parameter adjustment."""
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QSlider,
-    QCheckBox, QComboBox, QPushButton, QGroupBox,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSlider,
+    QVBoxLayout,
 )
 
-from ui.theme import MAIN_STYLESHEET, FONT_PRIMARY, FONT_MONO
-
-SMOOTH_PRESETS = [
-    ("SUAVE", 0.9, 0.02),
-    ("NORMAL", 1.4, 0.028),
-    ("REACTIVO", 2.2, 0.05),
-]
+from config import SMOOTH_PRESETS
+from ui.theme import FONT_MONO, FONT_PRIMARY, MAIN_STYLESHEET
 
 
 class SettingsDialog(QDialog):

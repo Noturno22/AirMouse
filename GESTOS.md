@@ -47,14 +47,22 @@ A mao de comandos nunca move o cursor; so dispara acoes.
 
 | Gestos | Descricao | Accao |
 |---|---|---|
-| Swipe p/ a direita | Deslizar a mao esquerda lateralmente p/ a direita | Fechar a interface (janela GUI) |
-| Swipe p/ a esquerda | Deslizar a mao esquerda lateralmente p/ a esquerda | "Deslike": abrir a interface (janela GUI) |
+| Swipe p/ a direita | Deslizar a mao esquerda lateralmente p/ a direita | Trocar para a proxima janela (Alt+Tab rapido) |
+| Swipe p/ a esquerda | Deslizar a mao esquerda lateralmente p/ a esquerda | Trocar para a janela anterior (Alt+Shift+Tab rapido) |
+| Segurar a mao aberta ~2s | Manter a mao esquerda aberta e parada | Abrir o alternador de janelas (escolher janela) |
 | Punho fechado (so ela) | Fechar apenas a mao esquerda | Fechar janela (Alt+F4) |
+| Abrir/fechar a mao 3x | Ciclar OPEN <-> FIST rapidamente 3x | Mostrar/ocultar a interface (GUI) |
 
-> **Nota**: o swipe p/ a esquerda (deslike) abre a janela de configuracao; o swipe p/ a
-> direita fecha-a. O scroll passou para o **punho da mao de comandos** e ja nao usa a
-> mao esquerda nem os dois dedos.
-> O punho fecha a janela **apenas quando e a unica mao presente** (nao confunde com o brilho de 2 maos).
+> **Nota**: o swipe faz uma troca **rapida** — avança/retrocede uma janela e
+> solta logo o Alt (ideal para mudar depressa). Se quiser **escolher** a janela,
+> segure a mao esquerda **aberta** durante ~2s: abre o alternador do Windows;
+> enquanto a mao continua aberta pode deslizar para a esquerda/direita para
+> navegar entre as janelas, e ao soltar (fechar ou tirar a mao) confirma a janela
+> selecionada. O punho fecha a janela **apenas quando e a unica mao presente**.
+> Abrir/fechar a mao 3x mostra/oculta a interface (GUI) de configuracao.
+> **Nota**: durante o gesto de abrir/fechar a mao 3x, os estados de punho
+> transitórios do meio NÃO fecham a janela — o fecho (Alt+F4) só dispara com
+> um punho fora de uma sequência de abrir/fechar.
 
 ---
 

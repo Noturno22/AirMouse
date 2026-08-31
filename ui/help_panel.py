@@ -1,10 +1,11 @@
 """Toggleable help overlay panel (cartão com seções agrupadas)."""
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QScrollArea, QFrame
+from PySide6.QtWidgets import QFrame, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ui.theme import (
-    TEXT_PRIMARY, TEXT_SECONDARY, ACCENT,
-    FONT_HELP, FONT_PRIMARY, FONT_PRIMARY_BOLD,
+    ACCENT,
+    FONT_PRIMARY,
+    FONT_PRIMARY_BOLD,
     gesture_color,
 )
 
@@ -28,15 +29,14 @@ SECTIONS = [
         (_dot(Gesture.OPEN), "mão aberta / 1 dedo", "mover cursor"),
         (_dot(Gesture.PINCH), "pinça (indicador)", "clique esq · manter = arrastar"),
         (_dot(Gesture.PINCH_MID), "pinça (médio)", "clique direito"),
-        (_dot(Gesture.FIST), "punho", "arrastar"),
     ]),
     ("SCROLL & VOLUME", [
-        (_dot(Gesture.PEACE), "dois dedos + cima/baixo", "scroll"),
+        (_dot(Gesture.FIST), "punho + cima/baixo", "scroll"),
         (_dot(Gesture.THREE), "três dedos + cima/baixo", "volume"),
     ]),
     ("BRILHO (2 MÃOS)", [
-        (_dot(Gesture.FIST), "punho · mão esq", "diminuir brilho"),
-        (_dot(Gesture.FIST), "punho · mão dir", "aumentar brilho"),
+        (_dot(Gesture.PEACE), "dois dedos · mão esq", "diminuir brilho"),
+        (_dot(Gesture.PEACE), "dois dedos · mão dir", "aumentar brilho"),
     ]),
     ("MULTIMÉDIA & SISTEMA", [
         (_dot(Gesture.THUMB_UP), "polegar cima", "play / pausa"),
@@ -46,9 +46,11 @@ SECTIONS = [
         ("", "bye bye (onda)", "minimizar (Win+↓)"),
         ("", "2 mãos abertas + afastar", "lupa (zoom)"),
     ]),
-    ("INTERFACE", [
-        ("", "swipe ← · mão esq", "abrir interface"),
-        ("", "swipe → · mão esq", "fechar interface"),
+    ("INTERFACE & JANELAS", [
+        ("", "swipe · mão esq", "próxima janela (Alt+Tab rápido)"),
+        ("", "swipe p/ esq · mão esq", "janela anterior (Alt+Shift+Tab)"),
+        ("", "segurar mão esq aberta", "escolher janela (alternador)"),
+        ("", "abrir/fechar mão 3x", "ligar/desligar interface"),
     ]),
 ]
 

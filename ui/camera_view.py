@@ -1,15 +1,14 @@
 """Camera feed display with hand skeleton overlay."""
 import cv2
-import numpy as np
-
-from PySide6.QtCore import Qt, QRect, QPoint
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QBrush
+from PySide6.QtCore import QPoint, QRect, Qt
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import QWidget
 
-from core.tracker import HAND_CONNECTIONS
 from core.gestures import Gesture
+from core.tracker import HAND_CONNECTIONS
 from ui.theme import (
-    TEXT_SECONDARY, BG_PRIMARY,
+    BG_PRIMARY,
+    TEXT_SECONDARY,
     gesture_color,
 )
 

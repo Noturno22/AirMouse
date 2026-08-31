@@ -115,15 +115,15 @@ Distribuível como pasta zipada; não precisa de Python instalado.
 | `accel_min_gain` / `accel_max_gain` | 1.2 / 3.0 | curva de aceleração: preciso devagar, rápido a varrer |
 | `accel_ref_speed` | 1400 | velocidade da mão (px/s) que atinge ganho máximo |
 | `filter_min_cutoff` / `filter_beta` | presets | suavidade (teclas `,` `.`) |
-| `pinch_on_ratio` / `pinch_off_ratio` | 0.38 / 0.55 | sensibilidade das pinças |
+| `pinch_on_ratio` / `pinch_off_ratio` | 0.42 / 0.58 | sensibilidade das pinças |
 | `scroll_gain_factor` | 0.06 | velocidade do scroll |
 | `volume_deadzone_px` | 3.0 | zona morta do gesto de volume |
-| `snap_radius_px` / `snap_strength` | 90 / 0.35 | raio e força da atração magnética |
-| `predict_ms` | 40 | antecipação do cursor (predição de movimento) |
+| `snap_radius_px` / `snap_strength` | 46.0 / 0.35 | raio e força da atração magnética |
+| `predict_ms` | 0.0 | antecipação do cursor (0 = desativada; ativa em `config.py`) |
 | `emitter_rate_hz` | 180 | frequência do emissor de movimento |
 | `clap_enabled` / `magnifier_enabled` | true | palmas→assistente · lupa 2 mãos |
 | `tts_enabled` / `whisper_model` | true / "small" | voz neural · tamanho do Whisper |
-| `low_light_boost` | true | realce automático com pouca luz |
+| `low_light_boost` | false | realce automático com pouca luz (liga no menu/`settings.json`)|
 | `deadzone_px` | 1.0 | mata micro-deriva com a mão parada |
 
 ## Engenharia incluída (porque não treme nem clica sozinho)

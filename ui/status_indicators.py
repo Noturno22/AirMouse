@@ -1,8 +1,8 @@
 """Top-right stacked status badges: AI confidence, magnifier, hand count."""
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
-from ui.theme import TEXT_PRIMARY, SUCCESS, FONT_MONO
+from ui.theme import FONT_MONO, SUCCESS, TEXT_PRIMARY
 
 
 class StatusBadges(QWidget):

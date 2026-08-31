@@ -44,7 +44,7 @@ def open_camera(cfg):
 class Collector:
     def __init__(self):
         self.samples = {i: [] for i in range(len(CLASS_NAMES))}
-        self.active: "int | None" = None
+        self.active: int | None = None
 
     def counts(self):
         return [len(self.samples[i]) for i in range(5)]
@@ -157,7 +157,6 @@ def run(args):
         auto_label, auto_left = args.cls.upper(), args.frames
         collector.active = CLASS_KEYS[key][1]
 
-    filters_dbg = FilterPair2D(1.4, 0.028)
     fps = 0.0
     last_seq = -1
     warmup = max(cfg.warmup_frames, 0)
