@@ -118,8 +118,15 @@ A chave é **não tratar todos os dispositivos como iguais**. Definir 3 tipos:
 | **Não validado** | Dispositivos raros/antigos, telemóveis low-end extremos | **Não prometer**; oferecer trial free; **nunca** em contrato institucional |
 
 **Regra de ouro comercial:**
-- **Consumer:** vender **sempre com trial/corrida** e política de reembolso — o risco é
-  absorvível e dá confiança.
+- **Consumer:** **NÃO** vender com "trial + reembolso aberto" — uma política de devolução em
+  aberto atrai **entusiastas que só querem experimentar e devolver**, corroendo a receita e o
+  CAC. Em vez disso:
+  - **O "experimentar" é a Free tier** (gated, com watermark) — o entusiasta prova de graça,
+    sem nunca nos custar um reembolso.
+  - **Refund apenas em casos legítimos:** falha técnica real em hardware **Validado** ou falha
+    de entrega do serviço institucional (violação de SLA). Como só prometemos o que está na
+    matriz ✅, o reembolso é raro — a matriz **previne** o abuso.
+  - **IAP mobile:** a loja gere; sem "refund" promovido.
 - **Institucional/B2B (o dinheiro gordo):** **NUNCA** fazer contrato sobre uma base de
   dispositivos não validados. No contrato, **especificar o parque de dispositivos** que o
   Mãouse suporta, e oferecer **piloto técnico de 2–4 semanas** para validar no parque real
@@ -175,7 +182,7 @@ permite ao piloto técnico validar no parque real do cliente antes do contrato a
 **Faseamento de lançamento recomendado:**
 1. **Beta fechado (Y0–S1):** 100 utilizadores, validação de procura, matriz de dispositivos,
    roadshow institucional, PR de origem.
-2. **Consumer (EN/PT):** lançamento Free+Pro com trial/reembolso — data alto.
+2. **Consumer (EN/PT):** lançamento Free+Pro — sem reembolso em aberto (ver §5 Reembolso).
 3. **Institucional (só depois de provas):** piloto pago + contrato, com parque validado.
 
 ---
@@ -194,6 +201,35 @@ permite ao piloto técnico validar no parque real do cliente antes do contrato a
 > **EN no dia 1, não no dia 400.** Se Europa/EUA/Ásia são a maior liquidez, a landing e o
 > produto têm de estar em **EN desde o arranque** (a decisão D4 já o exige). Adiar EN é
 > adiar os mercados de maior liquidez.
+
+---
+
+## 4.5. Política de Reembolso — receita-first (contra o entusiasta "só a experimentar")
+
+> **Problema:** uma política de reembolso em aberto ("trial, devolve se não gostares") atrai
+> **entusiastas que pagam, usam 15 dias e pedem devolução** só para experimentar. Isso corrói
+> a receita, infla o CAC e drena a equipa com pedidos. **O "experimentar" não pode ser o
+> reembolso.**
+
+### A regra: quem quer experimentar → usa a Free tier, não a devolução
+
+| Quem quer... | Usa | Porquê |
+|---|---|---|
+| Experimentar sem risco | **Free tier** (gated, watermark) | Prova de graça, sem nos custar um reembolso |
+| Por no PC do dia-a-dia/empresa | **Pro** (paga) | Compromete porque já viu o Free a funcionar |
+| Instituição (centro/hospital) | **Piloto técnico** (2–4 semanas) | Valida no parque real antes de assinar |
+
+### Quando fazemos refund (raramente)
+
+| Cenário | Reembolso? |
+|---|---|
+| Falha técnica real em hardware **Validado** (matriz ✅) | ✅ Sim (raro — a matriz previne) |
+| Falha de entrega/SLA em institucional | ✅ Sim (contrato) |
+| "Não gosto/não estava à espera" | ❌ Não (o Free tier cobria a experimentação) |
+| IAP mobile | Loja gere; nunca promovemos refund |
+
+> **Como a matriz protege a receita:** só prometemos o que está ✅ Validado — logo, quase nunca
+> devolvemos por "não funciona". O reembolso legítimo é **raro por desenho**, não por generosidade.
 
 ---
 
@@ -227,7 +263,7 @@ permite ao piloto técnico validar no parque real do cliente antes do contrato a
 ## 6. Resumo executivo — o que NÃO fazer vs o que fazer
 
 | ❌ NÃO | ✅ SIM |
-|---|---|
+|---|---|---|
 | Prometer "funciona em qualquer dispositivo" | Matriz de dispositivos Validado/Aceite/Não-validado |
 | Vender compliance/independência sem prova auditada | Roadmap de conformidade + disclaimer clínico + auditoria WCAG |
 | Abrir escritórios/equipas por país | Modelo nativa IA, EN global, tudo remoto |
@@ -235,6 +271,7 @@ permite ao piloto técnico validar no parque real do cliente antes do contrato a
 | Funcionalidade nova antes dos bloqueadores de venda | Licenciamento/gate/assinatura/ações nativas primeiro |
 | Adiar EN | EN no dia 1 (EN = liquidez) |
 | Escala prematura no mundo todo no Y1 | UE + PT/BR/AO + EN, só depois expandir |
+| **Reembolso em aberto ("trial, devolve se não gostares")** | **Free tier = experimentação; refund só p/ falha real em Validado/SLA** |
 
 ---
 

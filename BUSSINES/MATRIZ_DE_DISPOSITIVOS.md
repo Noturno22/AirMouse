@@ -23,7 +23,7 @@
 
 | Data | Device / Modelo | Webcam (res/fps) | CPU / GPU | Luz | FPS real | Latência | Cliques fantasma | Gestos (x/12+) | Snap | Veredito | Notas |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 2026-09-01 | ex.: Dell XPS 15 | 720p / 30 | i7 + integrada | boa | 28 | <80ms | 0 | 12/12 | OK | ✅ | — |
+| 2026-09-01 | HP Notebook · Intel i3-5005U 2.0GHz · 8GB RAM · Win10 Home 64 | 640×480 / 30 | i3-5005U (sem GPU) | boa | **14.6** | inferência 48.3 ms | 0 | (selftest) | off | 🟡 **Aceite** | `main.py --frames 60 --no-preview --no-gui` · 0 glitches · FPS<25 (CPU fraco) — ver `§2` notebook CPU fraco |
 |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 **Como testar (passo a passo):**
@@ -40,6 +40,7 @@
 
 | Data | Device / Modelo | Webcam | CPU | Sem GPU (`--no-gui`)? | FPS | Veredito | Notas |
 |---|---|---|---|---|---|---|---|
+| 2026-09-01 | HP Notebook · i3-5005U · 8GB · Win10 | 640×480/30 | i3-5005U (sem GPU, sem NPU) | sim (`--no-gui`) | 14.6 | 🟡 **Aceite** | Funciona, mas abaixo do alvo 25 fps — **exige maior cuidado na venda a parques 100% sem GPU/NPU** |
 |  |  |  |  |  |  |  |  |  |
 
 ---
@@ -72,17 +73,61 @@
 
 ## 6. Síntese (atualizar após cada 10 testes)
 
+> *Atualizado 2026-09-01 — primeiro dispositivo testado (HP Notebook i3-5005U). Ainda muito
+> longe do "go" institucional (≥5 ✅ por categoria). Contar ⚠️ "Bloqueado" e ❌ "Não-validado"
+> como não comercializáveis.*
+
 | Categoria | # Validado | # Aceite | # Não-validado | # Bloqueado | Cobertura p/ institucional? |
 |---|---|---|---|---|---|
-| Desktop webcam |  |  |  |  |  |
-| Desktop CPU fraco |  |  |  |  |  |
-| Mobile low-end |  |  |  |  |  |
-| Mobile OEM invulgar |  |  |  |  |  |
-| Modo remoto |  |  |  |  |  |
+| Desktop webcam | 0 | 1 | 0 | 0 | ❌ Não (1 🟡 não chega) |
+| Desktop CPU fraco | 0 | 1 | 0 | 0 | ❌ Não |
+| Mobile low-end | 0 | 0 | 0 | 0 | ❌ Não (nada testado) |
+| Mobile OEM invulgar | 0 | 0 | 0 | 0 | ❌ Não |
+| Modo remoto | 0 | 0 | 0 | 0 | ❌ Não |
+
+**Leitura imediata:** o produto **funciona num desktop fraco (i3, sem GPU)** — boa notícia de
+robustez — mas **só a 14.6 fps** nessa classe. Para marketing institucional falta **muito
+teste**. Próximos passos de recolha: (1) 1 dispositivo com GPU dedicada/NPU (medir se sobe a
+25+ fps); (2) 5 telemóveis low-end Android; (3) 1 parque real em piloto.
 
 **Regra de "go" institucional:** considerar o produto pronto para contratos B2B quando houver
 ≥ 5 dispositivos ✅ em cada categoria crítica (desktop webcam + mobile low-end), e um piloto
 técnico validado num parque real.
+
+### 6.1. Veredito "Go / Stop" institucional (atualizado com os dados de hoje)
+
+> **Veredito atual: 🟥 STOP para contratos B2B/B2G institucionais. 🟢 GO para consumer**
+> **(desktop/mobile) — mas SEM "trial com reembolso aberto": o experimento é a Free tier,
+> não a devolução.** (Ver `ANTIPADROES_E_RISCOS.md` §5.)
+
+| Decisão comercial | Estado | Base na matriz |
+|---|---|---|
+| 🟢 **Consumer desktop** (Pro €39,90) | **PODE vender** — sem reembolso em aberto | Funciona num desktop fraco |
+| 🟢 **Consumer mobile** (IAP) | **PODE** beta/soft-launch | Aviso de performance; nada valida em low-end ainda |
+| 🟡 **Piloto institucional TÉCNICO** (2–4 semanas no parque) | **PODE oferecer** — é exatamente o que falta | Usa o parque real do cliente como validação |
+| 🔴 **Contrato institucional ANUAL** (€5–50k) | **NÃO pode assinar ainda** | Só 0-1 🟡 por categoria; <5 ✅; sem parque validado |
+| ⚠️ **OEM/white-label** | **NÃO** | Requer prova de escala e parque estável |
+
+**Por que "STOP institucional" é a decisão certa (não pessimismo):**
+- O argumento comercial do Mãouse para institucional é *"validámos no teu parque antes de te
+  prometer"* (`ANTIPADROES` §2.B). Hoje só temos 1 🟡 — não há parque validado.
+- Um contrato institucional prometido a 500 computadores, com muitos sem GPU/NPU a ~15 fps,
+  **destruiria a confiança** — o ativo mais valioso que temos.
+- O **piloto técnico** é a ponte honesta: valida o parque real, gera a prova, e só depois
+  fecha o contrato. **Isto transforma a nossa falta atual de dados em arma de venda** (não
+  escondemos a fragilidade; usamo-la como processo de validação profissional).
+
+**O que desbloqueia o "GO" institucional (checklist minimamente viável):**
+1. [ ] ≥5 dispositivos ✅ em "Desktop webcam" (inclui ≥2 com GPU/NPU a 25+ fps).
+2. [ ] ≥5 telemóveis ✅ em "Mobile low-end".
+3. [ ] ≥1 piloto técnico completado num parque real (registo no §5/§6).
+4. [ ] Auditoria WCAG + seguro RC agendados/fechados (`ESTRATEGIA` §2.2).
+5. [ ] SLA + DPA operacionais (L2/L3).
+
+> **Em 1 frase:** hoje vendemos **consumer sem reembolso em aberto** (o "experimentar" é a
+> **Free tier**, não a devolução) e **pilotos técnicos a instituições**; ainda **não** vendemos
+> **contratos institucionais de longa duração** — isso vem quando a matriz mostrar ≥5 ✅ por
+> categoria.
 
 ---
 
