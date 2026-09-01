@@ -1,8 +1,8 @@
 # Revisão e Validação do Modelo de Negócio — Mãouse
 
 > Ficheiro de trabalho que valida o `MODELO_DE_NEGOCIO.md`, corrige inconsistências
-> e sinaliza as decisões que ainda faltam tomar. **Data:** 2026-08-31.
-> Autor: Luar Studio Angola · Estado: **PARCIALMENTE VALIDADO — 4 correções e 6 decisões em aberto.**
+> e sinaliza as decisões que ainda faltam tomar. **Data:** 2026-08-31 · **Atualizado:** 2026-09-01.
+> Autor: Luar Studio Angola · Estado: **VALIDADO — correções aplicadas; decisões D1–D6 fechadas em `DECISOES.md`.**
 
 ---
 
@@ -167,11 +167,11 @@ marca+domínios, landing+fúnel, code-signing, e posicionamento de acessibilidad
 
 ## 7. Ações a tomar neste ficheiro de origem
 
-1. Corrigir a aritmética do break-even (sec. 14) — ver §1.4 deste documento.
-2. Explicar a diferença de custos do Y1 (sec. 13 vs sec. 12) — ver §1.5.
-3. Adicionar as lacunas L1–L7 como linhas no plano de risco/roadmap.
-4. Fechar D1–D6 e registá-las (criar `BUSSINES/DECISOES.md`).
-5. Marcar este documento como "validado" após as correções.
+1. Corrigir a aritmética do break-even (sec. 14) — ver §1.4 deste documento. ✅ **Feito** (2026-09-01).
+2. Explicar a diferença de custos do Y1 (sec. 13 vs sec. 12) — ver §1.5. ✅ **Feito** (nota adicionada).
+3. Adicionar as lacunas L1–L7 como linhas no plano de risco/roadmap. ✅ **Incorporadas** nas secs. 12/15 e no `PLANO_DE_EXECUCAO_90_DIAS.md`.
+4. Fechar D1–D6 e registá-las (criar `BUSSINES/DECISOES.md`). ✅ **Feito** — ver `DECISOES.md`.
+5. Marcar este documento como "validado" após as correções. ✅ **Feito**.
 
 ---
 

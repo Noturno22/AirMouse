@@ -360,7 +360,8 @@ Equipa 500 postos com webcams; quer controlo touchless nos postos de higiene e q
 | Certificação/assinatura de código Windows | — | 300/ano | EV code signing |
 | Suporte (terceirizado/fundador) | 0 | 500 | Tickets + comunidade |
 | Contabilidade/legal (Angola + PT/UE) | 100 | 400 | Estrutura societária e contratos |
-| Total fixo médio | **~1.980/mês** | **~7.100/mês** | |
+| Taxas de processamento de pagamento (Paddle/Stripe ~3% + €0,30) e VAT UE (L6) | ~3% da receita | ~3% da receita | Paddle é Merchant of Record — gere o VAT UE; custo variável no desktop |
+| Total fixo médio | **~1.980/mês** | **~7.100/mês** | (lucro de custo variável apenas nas lojas e taxas de pagamento) |
 
 **Ponto importante:** a maior vantagem da empresa nativa de IA é que **o custo de desenvolvimento já foi ~€0** (construído com agentes). O que normalmente custava €80–150k de engenharia é agora uma despesa de eletricidade + noite da founder. Isso coloca o break-even muito baixo e o múltiplo de margem muito alto.
 
@@ -368,7 +369,9 @@ Equipa 500 postos com webcams; quer controlo touchless nos postos de higiene e q
 
 ## 13. Projeções Financeiras (5 anos, 3 cenários)
 
-> Pressupostos: conversão free→pago 1,5–4% (acessibilidade converte mais); receita média por pagante consumer ~€30/ano (mix lifetime+lifetime+subs); contratos institucionais começam Y2/Y3; OEM entra Y4/Y5; margem bruta 90%+.
+> Pressupostos: conversão free→pago 1,5–4% (acessibilidade converte mais); receita média por pagante consumer ~€30/ano (mix lifetime+subs); contratos institucionais começam Y2/Y3; OEM entra Y4/Y5; margem bruta 90%+.
+>
+> **Nota sobre custos Y1:** o custo fixo recorrente da sec. 12 é ~€1.980/mês (≈ €23.760/ano). O custo Y1 do cenário é **€38.000** — a diferença (~€14.240) corresponde aos **custos de lançamento fase 0**: registo de marca+domínios, landing page, primeiros vídeos de demonstração, custos legais de constituição da entidade UE (D5) e primeiras ferramentas. Por isso o custo médio real do Y1 é ~€3.200/mês, caindo para ~€2k/mês a partir do Y2.
 
 ### 13.1. Cenário Base (execução boa, sem golpe de sorte)
 
@@ -414,7 +417,12 @@ Equipa 500 postos com webcams; quer controlo touchless nos postos de higiene e q
 - **Cenário base:** break-even entre **mês 14 e 18** após o primeiro lançamento pago (Mãouse Pro em loja Windows/web) — dado que Y1 termina com EBITDA positivo.
 - **Cenário conservador:** mês 26–30.
 - **Cenário otimista:** mês 9–12.
-- Ponto de break-even em receita recorr.— simples: custos fixos ≈ €2k/mês → é preciso ≈ 60 subscrições Pro/ano-equivalente (€4,99) OU 1 contrato institucional pequeno/ano. **Número alcançável com um único contrato de acessibilidade.**
+- Ponto de break-even em receita recorrente — simples: com custos fixos ≈ €2.000/mês (≈ €24.000/ano), o equilíbrio depende do mix:
+  - ≈ **400 subscrições Pro ativas** (€4,99/mês → €59,88/ano), **OU**
+  - ≈ **600 licenças lifetime** vendidas (€39,90, uma vez — não recorrente), **OU**
+  - **1–2 contratos institucionais pequenos** (€5.000–24.000/ano cada).
+  **A via com menos risco é o contrato institucional — alcançável com um único centro de reabilitação.**
+  > ⚠️ Nota: a via lifetime é receita **uma vez** — não cobre os €24k/ano do ano seguinte se parar de vender. O break-even recorrente só se aplica à via subscrição/institucional.
 
 ---
 
@@ -641,7 +649,7 @@ O Mãouse é, simultaneamente:
 
 ### As 5 decisões imediatas
 
-1. **Aprovar este modelo** (fechar preços, segmentos e ordem de ataque).
+1. **Aprovar este modelo** (fechar preços, segmentos e ordem de ataque) — decisões D1–D6 fechadas em [`DECISOES.md`](DECISOES.md).
 2. **Registar marca + domínios Mãouse** (semana 1).
 3. **Encaixar a acessibilidade como posicionamento primário** (site, Play Store, documentação).
 4. **Arrancar o funil: página + 3 vídeos demo + open-core GitHub** (semana 2–4) + 10 contactos institucionais.
