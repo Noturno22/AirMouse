@@ -52,6 +52,7 @@ class MainWindow(QMainWindow):
         self._show_help = False
         self._smooth_name = "NORMAL"
         self._ui_show = False
+        self._hotkey_listener = None
         self._flash = 0
         self._last_frame = None
         self._all_frames = {}
@@ -72,6 +73,7 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._build_shortcuts()
+        self._start_global_hotkey()
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
@@ -153,6 +155,58 @@ class MainWindow(QMainWindow):
 
     def _build_shortcuts(self):
         pass
+
+    def _start_global_hotkey(self):
+        """Hotkey global (Ctrl+Shift+A) para abrir/fechar a interface de qualquer
+        lugar, mesmo com a janela oculta. Corre em thread própria (pynput)."""
+        try:
+            from pynput import keyboard
+        except Exception:
+            return
+
+        pressed = set()
+
+        def on_press(key):
+            try:
+                if key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                    pressed.add("ctrl")
+                elif key in (keyboard.Key.shift_l, keyboard.Key.shift_r):
+                    pressed.add("shift")
+                else:
+                    # Com Ctrl premido, o pynput reporta a tecla 'a' como o
+                    # caractere de controlo '\x01'. Aceitamos as duas formas.
+                    ch = getattr(key, "char", None)
+                    if ch in ("a", "A", "\x01") and {"ctrl", "shift"} <= pressed:
+                        from PySide6.QtCore import QTimer
+                        QTimer.singleShot(0, self._toggle_ui_global)
+            except Exception:
+                pass
+
+        def on_release(key):
+            try:
+                if key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                    pressed.discard("ctrl")
+                elif key in (keyboard.Key.shift_l, keyboard.Key.shift_r):
+                    pressed.discard("shift")
+            except Exception:
+                pass
+
+        try:
+            self._hotkey_listener = keyboard.Listener(
+                on_press=on_press, on_release=on_release, daemon=True
+            )
+            self._hotkey_listener.start()
+        except Exception:
+            self._hotkey_listener = None
+
+    def _toggle_ui_global(self):
+        if self._E is None:
+            return
+        self._E.ui["ui_show"] = not self._E.ui["ui_show"]
+        self._toast.show_toast(
+            "INTERFACE ON" if self._E.ui["ui_show"] else "INTERFACE OFF"
+        )
+
 
     def _menu_checkable(self, btn, checked):
         """Sincroniza o estado do botão SEM disparar o sinal toggled (que
@@ -473,6 +527,12 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._timer.stop()
+        if self._hotkey_listener is not None:
+            try:
+                self._hotkey_listener.stop()
+            except Exception:
+                pass
+            self._hotkey_listener = None
         try:
             if self._E is not None and self._E.emitter is not None:
                 self._E.emitter.stop()

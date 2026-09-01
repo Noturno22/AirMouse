@@ -12,6 +12,9 @@ class Config:
 
     move_gain: float = 2.0
     deadzone_px: float = 1.0
+    # Limiar de velocidade (px/s na câmara) abaixo do qual o cursor não mexe,
+    # para eliminar tremor/deriva quando a mão está (quase) parada.
+    still_velocity_px: float = 25.0
 
     filter_min_cutoff: float = 1.4
     filter_beta: float = 0.028

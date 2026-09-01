@@ -297,15 +297,33 @@ def main():
     cfg.gui_enabled = use_gui
     try:
         if use_gui:
-            run_gui(
+            result = run_gui(
                 cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice,
                 tuner, speaker, snap, assistant, magnifier, ctx, state,
                 tray_icon,
             )
+            if result is None:
+                log.info("A usar preview OpenCV (sem PySide6).")
+                end_state = run_loop(
+                    cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice,
+                    tuner, ctx, state,
+                )
+            else:
+                end_state = state
+                if (
+                    (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta) != initial_params
+                ) and tuner.enabled:
+                    save_settings(cfg, state.get("smooth_name", "NORMAL"))
+                end_state = None
             if (
-                (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta) != initial_params
-            ) and tuner.enabled:
-                save_settings(cfg, state.get("smooth_name", "NORMAL"))
+                end_state is not None
+                and (
+                    (cfg.move_gain, cfg.filter_min_cutoff, cfg.filter_beta) != initial_params
+                    or end_state.get("touched_settings")
+                )
+                and tuner.enabled
+            ):
+                save_settings(cfg, end_state["smooth_name"])
         else:
             end_state = run_loop(
                 cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, ctx,

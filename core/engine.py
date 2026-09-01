@@ -335,10 +335,15 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
             E.prev_filtered = (fx, fy)
 
             gain = cfg.move_gain * E.curve.apply(E.filters.vx, E.filters.vy)
+            # Escala UNIFORME (min): mapeia o movimento da câmara para o ecrã
+            # preservando a proporção. Com escala por eixo, num ecrã 16:9 a partir
+            # de uma câmara 4:3, mover a mão em diagonal resultado torto (X mais
+            # rapido que Y) — causa de "movimento bugado" neste PC.
             sx = mouse.screen_w / w
             sy = mouse.screen_h / h
-            mdx = dx * gain * sx
-            mdy = dy * gain * sy
+            s = min(sx, sy)
+            mdx = dx * gain * s
+            mdy = dy * gain * s
             movable = (
                 not state["paused"]
                 and now >= state["freeze_until"]
@@ -353,22 +358,39 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
                 mdx = 0.0
             if movable and abs(mdy) < cfg.deadzone_px:
                 mdy = 0.0
+            # Porta de repouso por VELOCIDADE: se a mão filtrada estiver (quase)
+            # parada, anula o movimento. Mata o tremor/deriva residual do subtíl
+            # do MediaPipe quando se para, sem criar "buraco morto" perceptível
+            # (o movimento real gera velocidade bem acima do limiar).
+            if movable and E.filters.velocity < cfg.still_velocity_px:
+                mdx = 0.0
+                mdy = 0.0
             if movable:
-                vspeed_cap = E.curve.ref_speed * 4.0 * cfg.move_gain
-                vxs = mdx / E.dt_ema if E.dt_ema > 0 else 0.0
-                vys = mdy / E.dt_ema if E.dt_ema > 0 else 0.0
+                # Cap de velocidade aplicado ao DESLOCAMENTO (mdx/mdy).
+                # Antes o cap reescalava apenas vx/vy (usados so no termo de
+                # lead), mas o push() usava o mdx original — logo um salto do
+                # tracker (abaixo do limiar de salto, ~224px) era amplificado por
+                # gain*s e virava TELEPORTE. Agora limitamos o proprio mdx/mdy.
+                dt = E.dt_ema
+                vxs = mdx / dt if dt > 0 else 0.0
+                vys = mdy / dt if dt > 0 else 0.0
                 sp = math.hypot(vxs, vys)
+                vspeed_cap = E.curve.ref_speed * 4.0 * cfg.move_gain
                 if sp > vspeed_cap and sp > 0:
                     k = vspeed_cap / sp
-                    vxs *= k
-                    vys *= k
-                lx, ly = lead_offset(vxs, vys, cfg.predict_ms)
+                    mdx *= k
+                    mdy *= k
+                lx, ly = lead_offset(
+                    mdx / dt if dt > 0 else 0.0,
+                    mdy / dt if dt > 0 else 0.0,
+                    cfg.predict_ms,
+                )
                 try:
                     cx, cy = mouse.mouse.position
                     pxl, pyl = ctx.snap.pull((cx, cy), now) if ctx.snap else (0.0, 0.0)
                 except Exception:
                     pxl = pyl = 0.0
-                E.emitter.push(mdx + lx + pxl, mdy + ly + pyl, E.dt_ema)
+                E.emitter.push(mdx + lx + pxl, mdy + ly + pyl, dt)
             tuner.feed(True, E.filters, mdx, mdy)
     else:
         if hand_frame is None:

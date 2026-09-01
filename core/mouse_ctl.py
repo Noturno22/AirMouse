@@ -78,9 +78,24 @@ class MouseCtl:
 
     @staticmethod
     def _enable_dpi_awareness():
+        """Garante que o processo reporte PIXELS FISICOS em qualquer maquina.
+
+        Sem isto, em monitores com scaling (125%/150%), GetSystemMetrics devolve
+        a resolucao logica (ex.: 1280x720 para um ecrã 1920x1080 a 150%), mas o
+        pynput continua a mover-se em pixels fisicos -> cursor com velocidade e
+        clamp errados. Preferimos Per-Monitor (2); se falhar, System DPI aware (1).
+        """
+        made = False
         try:
-            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+            made = ctypes.windll.shcore.SetProcessDpiAwareness(2) == 0
         except Exception:
+            made = False
+        if not made:
+            try:
+                made = ctypes.windll.shcore.SetProcessDpiAwareness(1) == 0
+            except Exception:
+                made = False
+        if not made:
             try:
                 ctypes.windll.user32.SetProcessDPIAware()
             except Exception:
@@ -88,6 +103,20 @@ class MouseCtl:
 
     @staticmethod
     def _screen_size():
+        """Dimensoes em pixels fisicos de TODOS os monitores (area virtual).
+
+        Usa o monitor virtual para que, em maquinas com 2+ monitores, o cursor
+        nao fique limitado/deslocado pelo monitor primario. Retorna sempre
+        resolucao fisica (ex.: 1920x1080 mesmo com scaling 150%).
+        """
+        try:
+            user32 = ctypes.windll.user32
+            w = int(user32.GetSystemMetrics(78))  # SM_CXVIRTUALSCREEN
+            h = int(user32.GetSystemMetrics(79))  # SM_CYVIRTUALSCREEN
+            if w > 0 and h > 0:
+                return (w, h)
+        except Exception:
+            pass
         try:
             user32 = ctypes.windll.user32
             return (
