@@ -60,7 +60,7 @@ Os **3 riscos bloqueadores de receita** (prioridade total, antes de qualquer fea
 | Teste de polimorfismo antivírus | Antivírus falsos positivos ao `.exe` | |
 | Confirmar assinatura de código | EV signing / Microsoft Store route (risco nº3) | |
 | Revisão Pocket A11y policy | Documentação de conformidade p/ Google Play (risco nº2) | |
-| **Iniciar matriz de dispositivos** | Preencher `MATRIZ_DE_DISPOSITIVOS.md` com 5+ devices (desktop + mobile low-end) durante o beta | |
+| **Iniciar LAB de hardware** | Montar a área `HARDWARE/` (LAB.md, PROBLEMAS_KNOWN, CHECKLIST) e preencher a `MATRIZ_DE_DISPOSITIVOS.md` com 5+ devices (desktop + mobile low-end) durante o beta | |
 
 ### 1.5. Validação da PROCURA (Semana 2–4) — novo, do ESTRATEGIA_GLOBAL §2.1a
 
@@ -97,7 +97,7 @@ auditoria WCAG + seguro RG agendados.
 
 | Ação | Detalhe | ✅ |
 |---|---|---|
-| Paddle checkout activo | Licenso Pro lifetime + sub + desconto acessibilidade | |
+| Paddle checkout activo | Licença Pro lifetime + sub + desconto acessibilidade + **política de reembolso (D7)** aplicada na configuração de refunds (`POLITICA_DE_REEMBOLSO.md`) | |
 | Primeiras licenças Pro | Beta users → conversão paga | |
 | **1º piloto institucional** | Assinar 1 centro de reabilitação (piloto: 5–20 licenças; objetivo = 1 contrato pequeno p/ ano, break-even mais curto) | |
 | Protocolo de prova clínica | Esboçar com universidade (não esperar Y3) — lacuna L4 | |
@@ -177,7 +177,7 @@ institucional ativo, decisão de direção Y2 tomada com dados.
 
 ---
 
-## 6. Definición de "feito" (completar os 90 dias)
+## 6. Definição de "feito" (completar os 90 dias)
 
 1. ✅ Marca + domínios `Mãouse` registados (moat nº1).
 2. ✅ Desktop vendável com assinatura de código e checkout Paddle a funcionar.
@@ -189,4 +189,53 @@ institucional ativo, decisão de direção Y2 tomada com dados.
 
 ---
 
-*Plano de execução — Luar Studio Angola · 2026. Baseado em MODELO_DE_NEGOCIO.md + REVISAO_E_VALIDACAO.md + DECISOES.md.*
+## 7. Estado atual & ponto de retoma (CHECKPOINT — atualizado 2026-09-01)
+
+> **Para retomar:** lê esta secção. Tudo o que está ✅ está feito e fundamentado em documentos;
+> o "Próximo passo" é a decisão mais óbvia que resta. Basta dizer "vamos fazer X".
+
+### 7.1 Estado estratégico (o que já está fechado)
+
+| Área | Estado | Ficheiro |
+|---|---|---|
+| Decisões comerciais D1–D7 | ✅ Fechadas | `DECISOES.md` |
+| Modelo de negócio (break-even corrigido) | ✅ | `MODELO_DE_NEGOCIO.md` |
+| Validação técnica | ✅ VALIDADO | `REVISAO_E_VALIDACAO.md` |
+| Estratégia global / 1ª venda com lucro / alvos UE+EN | ✅ | `ESTRATEGIA_GLOBAL.md` |
+| Auditoria técnica de prontidão (5+1 blockers) | ✅ | `PRONTIDAO_PARA_VENDA.md` |
+| O que NÃO fazer / riscos / quando lançar | ✅ | `ANTIPADROES_E_RISCOS.md` |
+| Política de reembolso (D7, receita-first) | ✅ texto pronto | `POLITICA_DE_REEMBOLSO.md` |
+| Área do gargalo de hardware | ✅ criada | `HARDWARE/` (LAB, PROBLEMAS_KNOWN, CHECKLIST) |
+| Matriz de dispositivos (resultados) | 🟡 0 ✅ / 1 🟡 / 0 ❌ | `MATRIZ_DE_DISPOSITIVOS.md` |
+
+### 7.2 Bloqueadores de venda (implementação = código) — nada feito ainda
+
+| # | Bloqueador | Onde implementar |
+|---|---|---|
+| 1 | Licenciamento + Paddle | Desktop (S2) |
+| 2 | Gate Free/Pro + watermark | Desktop (S2) |
+| 3 | .exe polido (assinatura/ícone/versão/console=False) | Desktop (S2) |
+| 4 | Ações nativas Android + AccessibilityService | `mobile/` (S2) |
+| 5 | IAP + store listing mobile | `mobile/` (S2) |
+| 6 | LAB de hardware a correr / preencher matriz | `HARDWARE/` (S1–S2) |
+
+### 7.3 Testes de hardware já feitos
+
+| Dispositivo | FPS | Veredito | Detalhe |
+|---|---|---|---|
+| HP Notebook · Intel i3-5005U · sem GPU | 14.6 fps (48.3 ms) | 🟡 Aceite | 0 glitches; câmara 640×480@30; `python main.py --frames 60 --no-preview --no-gui` |
+
+### 7.4 Próximo passo (escolher UMA via)
+
+- **A) Testar hardware real** — mais rápido de fazer e desbloqueia a matriz:
+  - Desktop com GPU/NPU (confirmar se sobe aos 25+ fps → ✅).
+  - 1º telemóvel low-end Android (bloqueador nº4, risco tela preta).
+- **B) Implementar código** — desbloqueia a 1ª venda paga:
+  - Gate Free/Pro + licenciamento Paddle no desktop (bloqueador nº1/2).
+
+> Recomendação: como o **gargalo é hardware**, testar um **desktop com GPU** primeiro dá a
+> prova rápida de que o produto sobe a 25+ fps (desbloqueia ✅ no marketing e contratos).
+
+---
+
+*Plano de execução — Luar Studio Angola · 2026. Baseado em MODELO_DE_NEGOCIO.md + REVISAO_E_VALIDACAO.md + DECISOES.md + HARDWARE/.*

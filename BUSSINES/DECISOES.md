@@ -112,6 +112,19 @@ utilizadores; assumir uma fração opt-in.
 
 ---
 
+## D7 — Política de reembolso (receita-first)
+
+**Decisão:** **Sem reembolso em aberto.** O "experimentar" é a **Free tier**, não a devolução.
+Reembolso **apenas** em falha técnica real em hardware **Validado** (matriz ✅) ou falha de SLA
+institucional. **"Não gostar" → não devolve** (o Free tier cobria a experimentação).
+
+- Texto oficial pronto a colar em Paddle/landing/termos/mobile: `POLITICA_DE_REEMBOLSO.md`.
+- Garantia de compatibilidade: reembolso em 14 dias **só** em dispositivo da lista Validado —
+  o que torna o reembolso legítimo **raro por desenho** (a matriz previne o abuso).
+- Protege a receita do "entusiasta só a experimentar" que compra e devolve.
+
+---
+
 ## Resumo executivo das decisões
 
 | Decisão | Resposta | Bloqueador de venda? |
@@ -122,6 +135,7 @@ utilizadores; assumir uma fração opt-in.
 | D4 Língua base | PT-BR + EN imediato | Sim (localização) |
 | D5 Sociedade | Angola + PT (2 entidades) | **Sim (B2G/B2B)** |
 | D6 Telemetria | Opt-in OFF por defeito | Não |
+| D7 Reembolso | Sem refund em aberto; só falha real em Validado/SLA | Não (texto pronto) |
 
 ---
 

@@ -5,6 +5,10 @@
 > "Validado / Aceite / Não-validado" de `ANTIPADROES_E_RISCOS.md` §2, e a arma de prova para
 > vendas B2B ("validámos no teu parque antes de te prometer").
 > **Data:** 2026-09-01 · Autor: Luar Studio Angola · Estado: **EM RECOLHA — começar a testar.**
+>
+> **Área dedicada ao gargalo de hardware:** o procedimento de teste está na pasta **`HARDWARE/`**
+> (`LAB.md` = protocolo, `PROBLEMAS_KNOWN.md` = registo de falhas, `CHECKLIST_VALIDACAO.md` =
+> checklist por dispositivo). Esta matriz guarda os **resultados**; o LAB explica **como** testar.
 
 ---
 
@@ -123,6 +127,9 @@ técnico validado num parque real.
 3. [ ] ≥1 piloto técnico completado num parque real (registo no §5/§6).
 4. [ ] Auditoria WCAG + seguro RC agendados/fechados (`ESTRATEGIA` §2.2).
 5. [ ] SLA + DPA operacionais (L2/L3).
+6. [ ] **LAB de hardware a correr** na área `HARDWARE/` (LAB.md + PROBLEMAS_KNOWN.md +
+    CHECKLIST_VALIDACAO.md) a gerar/encerrar linhas da matriz — a prova de que o gargalo de
+    compatibilidade é tratado como processo, não promessa.
 
 > **Em 1 frase:** hoje vendemos **consumer sem reembolso em aberto** (o "experimentar" é a
 > **Free tier**, não a devolução) e **pilotos técnicos a instituições**; ainda **não** vendemos

@@ -75,6 +75,7 @@ qualidade genuína. Mas **nada protege nem captura a primeira venda**:
 | 3 | **`.exe` polido**: assinatura EV, ícone, versão/empresa, `console=False`, instalador 1-clique | S2 |
 | 4 | **Ações nativas Android** + `AccessibilityService` + remover permissões sem uso | S2 |
 | 5 | **IAP mobile + store listing** posicionado acessibilidade + privacy policy + icons Mãouse | S2 |
+| 6 | **LAB de compatibilidade** (mover o gargalo de hardware para `HARDWARE/`): matriz Validado/Aceite/Não-validado preenchida em ≥5 devices por categoria crítica — evita prometer universalidade e **previne reembolsos (D7)** | S1–S2 |
 
 ---
 
@@ -86,11 +87,13 @@ Pré-requisito de "vendável" e **entra antes de feature nova**:
 2. **Ferramenta de assinatura EV + pack MSIX**: distribuir via Microsoft Store (evita SmartScreen e o pior do AV). Alternativa imediata: `.exe` assinado + instalador Inno.
 3. **Mobile:** implementar as 3 ações nativas Android + `AccessibilityService`, remover permissões mortas, adicionar IAP, submeter com posicionamento acessibilidade.
 4. **Higiene de qualidade:** zerar os 45 erros de ruff, adicionar CI, trocar LICENSE desktop do template pelo do estúdio, reconciliar marca "Mãouse" vs "AirMouse" em todo o produto.
+5. **LAB de hardware (área `HARDWARE/`):** preencher a `MATRIZ_DE_DISPOSITIVOS.md` com ≥5 devices por categoria crítica (desktop com GPU, desktop CPU fraco, mobile low-end) usando `HARDWARE/LAB.md` + `CHECKLIST_VALIDACAO.md`, e registar falhas em `HARDWARE/PROBLEMAS_KNOWN.md`. **Critério de "go":** ter pelo menos **1 ✅ Validado por categoria crítica** + este LAB a correr — é o que sustenta promessas honestas e reduz reembolsos (D7).
 
 > **Nota de honestidade:** mesmo após estes bloqueadores, o produto estará *vendável* apenas no
 > desktop consumer/mobile freeware; o pilar institucional (pacote compliance) **exige a auditoria
 > WCAG independente + seguro RC + entidade UE** (ver `REVISAO_ESTRATEGICA.md`), antes de vender
-> "conformidade" a hospitais.
+> "conformidade" a hospitais. E, por causa do **gargalo de hardware**, o institucional exige ainda
+> **≥5 ✅ por categoria crítica + 1 piloto real + o LAB a documentar** (ver `MATRIZ_DE_DISPOSITIVOS.md` §6.1).
 
 ---
 
