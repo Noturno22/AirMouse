@@ -53,14 +53,16 @@ mobile/airmouse-mobile/
 │   │   └── gesture.ts               # Tipos TypeScript
 │   └── constants/
 │       └── index.ts                 # Cores, labels, presets
-├── android/                         # Módulos nativos Android
-│   ├── TouchControllerModule.java
-│   ├── KeyboardControllerModule.java
-│   ├── SystemControllerModule.java
-│   └── AirMousePackage.java
-├── ios/                             # Módulos nativos iOS
+├── android/                         # Módulos nativos Android (Kotlin)
+│   ├── AirMouseAccessibilityService.kt   # Injeção de gestos/teclado (sem root)
+│   ├── TouchControllerModule.kt     # tap, longPress, swipe, drag, moveCursor
+│   ├── KeyboardControllerModule.kt  # typeText, pressKey, pressCombo, toggleKeyboard
+│   ├── SystemControllerModule.kt    # back/home/recents/notif, volume, brilho
+│   └── AirMousePackage.kt           # Regista os 3 módulos no RN
+├── ios/                             # Módulos nativos iOS (Swift)
 │   ├── TouchController.swift
-│   └── SystemController.swift
+│   ├── SystemController.swift
+│   └── KeyboardController.swift
 ├── app.json                         # Config Expo
 ├── eas.json                         # Config EAS Build
 └── package.json                     # Dependências
@@ -164,15 +166,25 @@ npx expo run:ios
 
 ## Módulos Nativos
 
-### Android (Java)
+> **Android requer o serviço de acessibilidade ativo** (para simular toques/gestos
+> em outras apps sem root). Ativar em:
+> `Definições > Acessibilidade > AirMouse`. Sem o serviço, os módulos não têm efeito.
 
-#### TouchControllerModule
+> **Nota iOS:** tap/gestos em outras apps exigem APIs privadas — a implementação atual
+> é um esboço funcional (clipboard + Accessibility), não garantida em todas as versões.
+
+### Android (Kotlin — via AirMouseAccessibilityService)
+
+`AirMousePackage` regista `TouchController`, `KeyboardController` e `SystemController`
+no `MainApplication.kt` (lista de packages).
+
+#### TouchController
 ```javascript
 // Tap no ecrã
 TouchController.tap(x, y);
 
 // Long press
-TouchController.longPress(x, y, duration);
+TouchController.longPress(x, y, duration); // duration em segundos
 
 // Swipe
 TouchController.swipe(x1, y1, x2, y2, duration);
@@ -181,24 +193,28 @@ TouchController.swipe(x1, y1, x2, y2, duration);
 TouchController.dragStart(x, y);
 TouchController.dragMove(x, y);
 TouchController.dragEnd();
+
+// Mover "cursor" continuamente
+TouchController.moveCursor(x, y);
 ```
 
-#### KeyboardControllerModule
+#### KeyboardController
 ```javascript
-// Digitar texto
+// Digitar texto (cola no campo focado)
 KeyboardController.typeText("Hello");
 
-// Pressionar tecla
-KeyboardController.pressKey(66); // Enter
+// Pressionar tecla (66=Enter, 67=Backspace, 61=Tab)
+KeyboardController.pressKey(66);
 
-// Combinação de teclas
+// Combinação de teclas (113=Ctrl)
 KeyboardController.pressCombo([113, 31]); // Ctrl+C
+KeyboardController.pressCombo([113, 50]); // Ctrl+V
 
 // Toggle teclado
 KeyboardController.toggleKeyboard();
 ```
 
-#### SystemControllerModule
+#### SystemController
 ```javascript
 // Voltar
 SystemController.goBack();
@@ -219,7 +235,7 @@ SystemController.adjustVolume(-1); // -1 = descer
 // Brilho
 SystemController.setBrightness(128); // 0-255
 
-// Screenshot
+// Screenshot (Android 11+)
 SystemController.takeScreenshot();
 ```
 
@@ -333,6 +349,11 @@ Verificar se `hand_landmarker.task` está em `assets/`
 npx expo prebuild --clean
 ```
 
+### Gestos não têm efeito no Android
+Ativar o serviço de acessibilidade: `Definições > Acessibilidade > AirMouse`.
+Sem isto, `TouchController`/`SystemController`/`KeyboardController` não conseguem
+injetar ação noutras apps (o Android exige o serviço para gestos globais sem root).
+
 ### Build falha no EAS
 ```bash
 # Limpar cache
@@ -344,11 +365,12 @@ eas build --profile development --platform android --clear-cache
 
 ## Próximos Passos
 
+- [x] Módulos nativos Android (gestos, teclado, sistema) via AccessibilityService
 - [ ] Testar em dispositivo real
+- [ ] Ativar/validar o serviço de acessibilidade em telemóveis reais
 - [ ] Otimizar performance em devices low-end
 - [ ] Adicionar controlo de voz (Whisper/Vosk)
 - [ ] Implementar calibração automática
-- [ ] Adicionar modo desktop (remoto para PC)
 - [ ] Publicar na Play Store / App Store
 
 ---

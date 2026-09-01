@@ -47,6 +47,10 @@
         }
       ],
       [
+        "./plugins/with-airmouse-native",
+        {}
+      ],
+      [
         "expo-dev-client",
         {
           "addGeneratedScheme": false
