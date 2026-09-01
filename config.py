@@ -136,6 +136,9 @@ class Config:
     gui_enabled: bool = True
     selftest_frames: int = 0
 
+    # Licenciamento (preenchido em main.py; default = "free")
+    license_tier: str = "free"
+
 
 SMOOTH_PRESETS = (
     ("SUAVE", 0.9, 0.02),

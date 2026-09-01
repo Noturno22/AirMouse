@@ -123,6 +123,14 @@ def draw_overlay(frame, all_frames, active_side, last_scroll, fps, cfg,
         cv2.FONT_HERSHEY_SIMPLEX, 0.45, COLOR_GRAY, 1, cv2.LINE_AA,
     )
 
+    if cfg.license_tier != "pro":
+        wtxt = "MAouse FREE"
+        (tww, twh), _ = cv2.getTextSize(wtxt, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        cv2.putText(
+            frame, wtxt, ((w - tww) // 2, 44),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (90, 180, 255), 2, cv2.LINE_AA,
+        )
+
     if hand_frame is not None:
         ratio = min(hand_frame.pinch_ratio / 1.2, 1.0)
         pinch_color = COLOR_GREEN if hand_frame.gesture == Gesture.PINCH else COLOR_GRAY

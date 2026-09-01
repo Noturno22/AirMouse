@@ -56,6 +56,12 @@ class MenuPanel(QWidget):
 
         root.addStretch(1)
 
+        # Upgrade Pro — destaque visual quando em modo Free.
+        self.btn_upgrade = self._make_button("★  UPGRADE PRO")
+        self.btn_upgrade.setObjectName("MenuBtnUpgrade")
+        self.btn_upgrade.setFixedHeight(34)
+        root.addWidget(self.btn_upgrade)
+
     @staticmethod
     def _make_section(text):
         lbl = QLabel(text)

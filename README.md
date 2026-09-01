@@ -165,10 +165,12 @@ airmouse/
 │   ├── tray.py          ← ícone na bandeja (pystray)
 │   ├── tracker.py       ← HandLandmarker (VIDEO mode, até 2 mãos)
 │   ├── camera.py        ← CameraStream (thread + MJPG + dedup)
+│   ├── licensing.py     ← Gate Free/Pro + chave offline HMAC + checkout Paddle
 │   └── mouse_ctl.py     ← pynput + press/release/scroll fracionário
 ├── tools/
 │   ├── collect_gestures.py    ← coleta landmarks reais
 │   ├── train_gesture_ai.py    ← treino (sintético + --real dados reais)
+│   ├── issue_pro_key.py       ← emite chave Pro (requer secret real de produção)
 │   └── test_v3.py             ← suíte de testes v3 (17 testes)
 └── models/              ← hand_landmarker.task · gesture_mlp.npz · vosk · piper/
 ```

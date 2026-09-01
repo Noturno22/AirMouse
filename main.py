@@ -25,6 +25,7 @@ from core.camera import CameraStream
 from core.commands import AppCtl, apply_command
 from core.engine import run_loop
 from core.gesture_ai import GestureAI, ensure_ai_model
+from core.licensing import LicenseManager
 from core.log import get_logger, setup_logging
 from core.mouse_ctl import MouseCtl
 from core.snap import SnapEngine
@@ -44,25 +45,41 @@ def parse_args():
     parser.add_argument("--no-preview", action="store_true")
     parser.add_argument("--preview", action="store_true", help="forca janela mesmo em modo bandeja")
     parser.add_argument("--gpu", action="store_true", help="tenta usar delegado GPU no tracker")
-    parser.add_argument("--tray", action="store_true", help="modo bandeja: invisivel com icone na bandeja")
+    parser.add_argument("--tray", action="store_true",
+                        help="modo bandeja: invisivel com icone na bandeja")
     parser.add_argument("--no-gui", action="store_true",
                         help="usa o preview OpenCV em vez da janela PySide6")
     parser.add_argument("--reset-config", action="store_true", help="apaga settings.json")
     parser.add_argument("--no-voice", action="store_true", help="desativa comandos de voz")
     parser.add_argument("--no-ai", action="store_true", help="desativa classificador IA de gestos")
     parser.add_argument("--no-autotune", action="store_true", help="desativa auto-afinacao")
-    parser.add_argument("--pinch-debug", action="store_true", help="imprime racios de pinca no console")
-    parser.add_argument("--voice-always", action="store_true", help="voz sempre ativa (sem wake word)")
+    parser.add_argument("--pinch-debug", action="store_true",
+                        help="imprime racios de pinca no console")
+    parser.add_argument("--voice-always", action="store_true",
+                        help="voz sempre ativa (sem wake word)")
     parser.add_argument("--no-tts", action="store_true", help="sem voz falada do Jarvis")
     parser.add_argument("--whisper-model", type=str, default=None,
                         help="modelo Whisper (tiny/base/small; default small)")
-    parser.add_argument("--log-level", type=str, default="INFO", choices=["DEBUG", "INFO", "WARNING"],
+    parser.add_argument("--log-level", type=str, default="INFO",
+                        choices=["DEBUG", "INFO", "WARNING"],
                         help="nivel de log (default: INFO)")
     parser.add_argument(
         "--frames",
         type=int,
         default=0,
         help="processa apenas N frames e sai (modo de teste)",
+    )
+    parser.add_argument(
+        "--activate-key",
+        type=str,
+        default=None,
+        metavar="CHAVE",
+        help="ativa uma licenca Pro offline e sai (MAO-XXXX-...).",
+    )
+    parser.add_argument(
+        "--deactivate",
+        action="store_true",
+        help="remove a licenca Pro (volta a Free) e sai.",
     )
     return parser.parse_args()
 
@@ -105,7 +122,7 @@ def resolve_assistant(cfg):
 
 
 def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, speaker,
-            snap, assistant, magnifier, ctx, state, tray_icon):
+            snap, assistant, magnifier, ctx, state, tray_icon, license_mgr=None):
     """Arranca a janela nativa PySide6 (MainWindow) como interface principal.
 
     A MainWindow apresenta o feed com o esqueleto e overlays; a lógica de
@@ -126,6 +143,7 @@ def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, spea
         cfg, cam, tracker, mouse, gesture_ai=gesture_ai, voice=voice,
         tuner=tuner, speaker=speaker, snap=snap,
         assistant=assistant, magnifier=magnifier,
+        license_mgr=license_mgr,
     )
     window.setWindowTitle("AirMouse")
     window.resize(900, 640)
@@ -157,6 +175,42 @@ def main():
     setup_logging(level=getattr(logging, args.log_level, logging.INFO))
     cfg = Config()
     cfg.selftest_frames = args.frames
+
+    # Licenciamento: cria o gestor, carrega o estado persistido e aplica o gate
+    # Free/Pro ANTES de inicializar serviços (para não arrancar voz/snap/... no Free).
+    lic_ = LicenseManager()
+    lic_.load()
+    cfg.license_tier = lic_.tier.value
+
+    # Ações CLI de licença (retornam imediatamente).
+    if args.activate_key:
+        if lic_.activate(args.activate_key):
+            print("Licença Pro ATIVADA com sucesso.")
+        else:
+            print("ERRO: chave de licença inválida.")
+        return 0
+    if args.deactivate:
+        lic_.deactivate()
+        cfg.license_tier = "free"
+        print("Licença removida (modo Free ativo).")
+        return 0
+
+    # Gate Free/Pro: no tier Free, desligam-se as funcionalidades Pro-locked
+    # independentemente de settings.json (o gate manda).
+    from core.licensing import entitlements as _ent
+    ent = _ent(lic_.tier)
+    cfg.snap_enabled = cfg.snap_enabled and ent["snap"]
+    cfg.voice_enabled = cfg.voice_enabled and ent["voice"]
+    cfg.tts_enabled = cfg.tts_enabled and ent["tts"]
+    cfg.ai_enabled = cfg.ai_enabled and ent["ai"]
+    cfg.autotune_enabled = cfg.autotune_enabled and ent["autotune"]
+    cfg.low_light_boost = cfg.low_light_boost and ent["low_light"]
+    cfg.magnifier_enabled = cfg.magnifier_enabled and ent["two_hands"]
+    cfg.clap_enabled = cfg.clap_enabled and ent["two_hands"]
+    cfg.left_hand_commands = cfg.left_hand_commands and ent["two_hands"]
+    cfg.num_hands = 2 if ent["two_hands"] else 1
+
+    log.info("License: %s", "PRO" if lic_.is_pro else "FREE")
 
     mutex = acquire_single_instance()
     if mutex is None:
@@ -300,7 +354,7 @@ def main():
             result = run_gui(
                 cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice,
                 tuner, speaker, snap, assistant, magnifier, ctx, state,
-                tray_icon,
+                tray_icon, license_mgr=lic_,
             )
             if result is None:
                 log.info("A usar preview OpenCV (sem PySide6).")

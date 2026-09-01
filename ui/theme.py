@@ -200,6 +200,29 @@ QPushButton#MenuBtn:checked {
     color: #0A0A12;
     border-color: #7DD4FF;
 }
+QPushButton#MenuBtnUpgrade {
+    background-color: rgba(214, 175, 60, 0.12);
+    color: #FFD766;
+    border: 1px solid #B8860B;
+    border-left: 3px solid #FFD766;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Consolas';
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+}
+QPushButton#MenuBtnUpgrade:hover {
+    background-color: #B8860B;
+    color: #0A0A12;
+    border-color: #FFD766;
+}
+QPushButton#MenuBtnUpgrade:disabled {
+    background-color: transparent;
+    color: #6A7B8A;
+    border: 1px solid #1A1A2E;
+    border-left: 3px solid #2A3B4A;
+}
 QDialog#SettingsDialog {
     background-color: #0A0A12;
     color: #F0F4F8;

@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, cfg, cam, tracker, mouse, gesture_ai=None,
                  voice=None, tuner=None, speaker=None, snap=None,
-                 assistant=None, magnifier=None):
+                 assistant=None, magnifier=None, license_mgr=None):
         super().__init__()
         init_gesture_colors()
 
@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
         self._snap = snap
         self._assistant = assistant
         self._magnifier = magnifier
+        self._license = license_mgr
 
         self._paused = False
         self._show_help = False
@@ -74,6 +75,7 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._build_shortcuts()
         self._start_global_hotkey()
+        self._sync_license_ui()
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
@@ -117,6 +119,15 @@ class MainWindow(QMainWindow):
 
         self._toast = Toast(central)
 
+        # Watermark da versão Free (demo). Some quando ativa Pro.
+        self._watermark = QLabel(central)
+        self._watermark.setObjectName("Watermark")
+        self._watermark.setText("MÃouse FREE")
+        self._watermark.setStyleSheet(
+            "color:#50C8FF;font-family:Consolas;font-size:11px;"
+            "letter-spacing:1px;background:transparent;"
+        )
+
         self._help = HelpPanel(central)
         self._help.move(12, 120)
 
@@ -148,6 +159,7 @@ class MainWindow(QMainWindow):
         m.btn_help.toggled.connect(self._toggle_help)
         m.btn_config.clicked.connect(self._open_settings)
         m.btn_quit.clicked.connect(self.close)
+        m.btn_upgrade.clicked.connect(self._open_license)
         self._menu_buttons = [
             m.btn_pause, m.btn_save, m.btn_voice, m.btn_snap,
             m.btn_camera, m.btn_help, m.btn_config, m.btn_quit,
@@ -254,7 +266,9 @@ class MainWindow(QMainWindow):
 
     def _sync_toolbar(self):
         self._menu.btn_pause.setText("⏸  PAUSA" if not self._paused else "▶  RETOMAR")
-        self._menu_checkable(self._menu.btn_voice, bool(self._voice) and self._voice.status != "off")
+        self._menu_checkable(
+            self._menu.btn_voice, bool(self._voice) and self._voice.status != "off",
+        )
         self._menu_checkable(self._menu.btn_snap, bool(self._cfg.snap_enabled))
 
     def keyPressEvent(self, event):
@@ -318,12 +332,26 @@ class MainWindow(QMainWindow):
 
     def _open_settings(self):
         from ui.settings_dlg import SettingsDialog
-        dlg = SettingsDialog(self._cfg, self._smooth_name, self)
+        dlg = SettingsDialog(self._cfg, self._smooth_name, self,
+                             license_mgr=self._license)
         if dlg.exec() == SettingsDialog.Accepted:
             self._smooth_name = dlg.smooth_name
             if self._E is not None:
                 self._E.filters.set_params(self._cfg.filter_min_cutoff, self._cfg.filter_beta)
             self._toast.show_toast("Definições atualizadas")
+
+    def _open_license(self):
+        from ui.license_dlg import LicenseDialog
+        dlg = LicenseDialog(self._cfg, self._license, self)
+        if dlg.exec() == LicenseDialog.Accepted:
+            self._sync_license_ui()
+
+    def _sync_license_ui(self):
+        """Atualiza a UI consoante o estado da licença (Free vs Pro)."""
+        is_pro = bool(self._license and self._license.is_pro)
+        self._menu.btn_upgrade.setText("✔  PRO ATIVO" if is_pro else "★  UPGRADE PRO")
+        self._menu.btn_upgrade.setEnabled(not is_pro)
+        self._watermark.setVisible(not is_pro)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -334,6 +362,9 @@ class MainWindow(QMainWindow):
         self._status.resize(300, 28)
         self._status_bar.setGeometry(0, h - 22, w, 22)
         self._fps_lbl.setGeometry(w - 100, h - 22, 90, 22)
+        wm = self._watermark
+        wm.adjustSize()
+        wm.move((w - wm.width()) // 2, h - 34)
         tw = self._toast.width() if self._toast.width() > 0 else 200
         self._toast.move((w - tw) // 2, 50)
 
@@ -479,6 +510,8 @@ class MainWindow(QMainWindow):
             strip += " | AT"
         if self._speaker:
             strip += f" | voz:{self._speaker.status}"
+        if self._license and not self._license.is_pro:
+            strip += " | FREE"
         self._status_bar.setText(strip)
         self._fps_lbl.setText(f"{self._fps:4.0f} fps")
 
