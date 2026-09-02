@@ -13,8 +13,10 @@ CLASSES = (
     Gesture.PEACE,
     Gesture.THREE,
     Gesture.THUMB_UP,
+    Gesture.ROCK,
+    Gesture.SHAKA,
 )
-FEATURES = 40
+FEATURES = 60
 N_CLASSES = len(CLASSES)
 
 MODEL_URLS = (
@@ -23,7 +25,10 @@ MODEL_URLS = (
 
 
 def _normalize(points):
-    pts = np.asarray(points, dtype=np.float64)[:, :2]
+    pts = np.asarray(points, dtype=np.float64)
+    # Fallback 2D legado: se a entrada não tem z, assume z = 0 (compatível).
+    if pts.shape[1] == 2:
+        pts = np.column_stack([pts, np.zeros(len(pts))])
     wrist = pts[0]
     v = pts[9] - wrist
     scale = np.hypot(v[0], v[1])
@@ -31,10 +36,15 @@ def _normalize(points):
         return None
     theta = -np.arctan2(v[1], v[0])
     cos, sin = np.cos(theta), np.sin(theta)
-    rel = pts[1:] - wrist
-    x = rel[:, 0] * cos - rel[:, 1] * sin
-    y = rel[:, 0] * sin + rel[:, 1] * cos
-    return np.concatenate([x / scale, y / scale])
+    rel_xy = pts[1:, :2] - wrist[:2]
+    x = rel_xy[:, 0] * cos - rel_xy[:, 1] * sin
+    y = rel_xy[:, 0] * sin + rel_xy[:, 1] * cos
+    # z relativo ao pulso, SEM dividir pela escala 2D em px: ao contrário de
+    # x,y (que estão em px após lm*width/height), o z do MediaPipe já é
+    # unidade interna da mão (scale-free, ~0.3-0.5, invariante à distância).
+    # Dividir por scale (px) esmagaria o sinal 3D (z -> ~0.003, morto).
+    z_rel = pts[1:, 2] - wrist[2]
+    return np.concatenate([x / scale, y / scale, z_rel])
 
 
 class GestureAI:
@@ -49,6 +59,11 @@ class GestureAI:
             raise FileNotFoundError(
                 f"modelo obsoleto em {path} ({self.b3.shape[0]} classes; "
                 f"esperado {N_CLASSES}). Retreina: tools\\train_gesture_ai.py"
+            )
+        if self.w1.shape[0] != FEATURES:
+            raise FileNotFoundError(
+                f"modelo obsoleto em {path} ({self.w1.shape[0]} features; "
+                f"esperado {FEATURES} 3D). Retreina: tools\\train_gesture_ai.py"
             )
 
     def classify(self, points_px):

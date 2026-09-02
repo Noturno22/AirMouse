@@ -21,8 +21,13 @@ CLASS_KEYS = {
     ord("5"): ("PEACE", 4),
     ord("6"): ("THREE", 5),
     ord("7"): ("THUMB_UP", 6),
+    ord("8"): ("ROCK", 7),
+    ord("9"): ("SHAKA", 8),
 }
-CLASS_NAMES = ("OPEN", "PINCH", "PINCH_MID", "FIST", "PEACE", "THREE", "THUMB_UP")
+CLASS_NAMES = (
+    "OPEN", "PINCH", "PINCH_MID", "FIST", "PEACE",
+    "THREE", "THUMB_UP", "ROCK", "SHAKA",
+)
 MAX_PER_CLASS = 5000
 COLOR_DARK = (22, 22, 22)
 COLOR_GREEN = (90, 220, 90)
@@ -47,7 +52,7 @@ class Collector:
         self.active: int | None = None
 
     def counts(self):
-        return [len(self.samples[i]) for i in range(5)]
+        return [len(self.samples[i]) for i in range(len(CLASS_NAMES))]
 
     def total(self):
         return sum(self.counts())
@@ -187,7 +192,10 @@ def run(args):
             quality_ok = False
             if hands:
                 lm = hands[0]
-                pts = np.array([(p[0] * w, p[1] * h) for p in lm], dtype=np.float32)
+                pts = np.array(
+                    [(p[0] * w, p[1] * h, p[2] if len(p) > 2 else 0.0) for p in lm],
+                    dtype=np.float32,
+                )
                 scale = float(np.hypot(*(pts[9] - pts[0])))
                 quality_ok = scale >= cfg.min_hand_scale_px * 1.15 and bool(
                     np.all(np.isfinite(pts))
@@ -252,7 +260,7 @@ def parse_args():
         "--frames", type=int, default=0,
         help="modo automatico: captura N amostras do gesto --class e sai",
     )
-    p.add_argument("--class", dest="cls", default=None, help="OPEN|PINCH|PINCH_MID|FIST|PEACE")
+    p.add_argument("--class", dest="cls", default=None, help="OPEN|PINCH|PINCH_MID|FIST|PEACE|THREE|THUMB_UP|ROCK|SHAKA")
     return p.parse_args()
 
 

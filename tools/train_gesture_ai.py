@@ -7,7 +7,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.gesture_ai import CLASSES, FEATURES, N_CLASSES, GestureAI
+from core.gesture_ai import CLASSES, FEATURES, N_CLASSES, GestureAI, _normalize
 from core.gestures import Gesture
 
 RNG = np.random.default_rng(7)
@@ -37,14 +37,19 @@ FINGER_CHAINS = {
 }
 
 
-def _chain(base, ang0, lengths, curls, max_angles):
-    pts = [np.asarray(base, dtype=np.float64)]
-    p = pts[0].copy()
+def _chain(base, ang0, lengths, curls, max_angles, fold_gain=0.22):
+    pts = []
+    p = np.asarray(base, dtype=np.float64)[:2]
+    z = 0.0
     ang = ang0
+    pts.append(np.array([p[0], p[1], z]))
     for L, amax, c in zip(lengths, max_angles, curls):
         ang += float(c) * amax
+        # z: dedos dobrados aproximam-se da câmara (negativo resp. ao pulso).
+        # Só acumula com a dobragem (c) — dedo esticado mantém z ~ 0.
+        z += -L * amax * c * fold_gain
         p = p + L * np.array([np.cos(ang), np.sin(ang)])
-        pts.append(p.copy())
+        pts.append(np.array([p[0], p[1], z]))
     return pts
 
 
@@ -60,8 +65,10 @@ def synthesize(gesture, rng):
     def jitter(a=0.05):
         return rng.uniform(-a, a)
 
-    skel[0] = np.array(OPEN_SKELETON[0])
-    skel[1] = np.array(OPEN_SKELETON[1]) + rng.uniform(-0.03, 0.03, 2)
+    skel[0] = np.array([OPEN_SKELETON[0][0], OPEN_SKELETON[0][1], 0.0])
+    skel[1] = np.array(
+        [OPEN_SKELETON[1][0] + jitter(0.03), OPEN_SKELETON[1][1] + jitter(0.03), 0.0]
+    )
 
     t_curls = (jitter(0.15), 0.15 + jitter(0.1), 0.1 + jitter(0.1))
     th = _thumb(t_curls)
@@ -71,7 +78,10 @@ def synthesize(gesture, rng):
         ids, ang0 = FINGER_CHAINS[name]
         lengths = tuple(L * (1.0 + jitter(0.08)) for L in FINGER_LEN[name])
         curls = tuple(min(max(c + jitter(0.12), 0.0), 1.0) for c in curl_base)
-        base = np.array(OPEN_SKELETON[base_id]) + rng.uniform(-0.04, 0.04, 2)
+        base = np.array(
+            [OPEN_SKELETON[base_id][0] + jitter(0.04),
+             OPEN_SKELETON[base_id][1] + jitter(0.04), 0.0]
+        )
         pts = _chain(base, ang0 + spread, lengths, curls, MAX_ANGLES)
         for k, i in enumerate(ids):
             skel[i] = pts[k]
@@ -88,14 +98,28 @@ def synthesize(gesture, rng):
         finger("ring", 13, (0.94, 0.97, 0.92), jitter(0.05))
         finger("pinky", 17, (0.96, 0.98, 0.9), jitter(0.05))
         # polegar dobrado sobre a palma (evita confundir com THUMB_UP)
-        skel[2] = np.array([-0.32, -0.26]) + rng.uniform(-0.03, 0.03, 2)
-        skel[3] = np.array([-0.45, -0.50]) + rng.uniform(-0.04, 0.04, 2)
-        skel[4] = np.array([-0.36, -0.70]) + rng.uniform(-0.04, 0.04, 2)
+        skel[2] = np.array([-0.32 + jitter(0.03), -0.26 + jitter(0.03), -0.30])
+        skel[3] = np.array([-0.45 + jitter(0.04), -0.50 + jitter(0.04), -0.34])
+        skel[4] = np.array([-0.36 + jitter(0.04), -0.70 + jitter(0.04), -0.38])
     elif gesture == Gesture.PEACE:
         finger("index", 5, (0.05, 0.04, 0.03), jitter(0.06))
         finger("middle", 9, (0.05, 0.04, 0.03), jitter(0.06))
         finger("ring", 13, (0.93, 0.95, 0.9), jitter(0.05))
         finger("pinky", 17, (0.95, 0.96, 0.9), jitter(0.05))
+    elif gesture == Gesture.ROCK:
+        finger("index", 5, (0.05, 0.04, 0.03), jitter(0.06))
+        finger("pinky", 17, (0.06, 0.04, 0.03), jitter(0.06))
+        finger("middle", 9, (0.93, 0.95, 0.9), jitter(0.05))
+        finger("ring", 13, (0.94, 0.95, 0.9), jitter(0.05))
+    elif gesture == Gesture.SHAKA:
+        finger("index", 5, (0.92, 0.95, 0.9), jitter(0.05))
+        finger("middle", 9, (0.93, 0.95, 0.9), jitter(0.05))
+        finger("ring", 13, (0.94, 0.95, 0.9), jitter(0.05))
+        # polegar + mindinho esticados (espécime do "hang loose")
+        finger("pinky", 17, (0.05, 0.04, 0.03), jitter(0.06))
+        t_curls = (0.05, 0.04, 0.03)
+        th = _thumb(t_curls)
+        skel[2], skel[3], skel[4] = th[1], th[2], th[3]
     elif gesture == Gesture.PINCH:
         finger("index", 5, (0.52, 0.72, 0.78), jitter(0.05))
         finger("middle", 9, (0.18, 0.14, 0.1), jitter(0.06))
@@ -131,7 +155,9 @@ def synthesize(gesture, rng):
         finger("middle", 9, (0.94, 0.97, 0.92), jitter(0.05))
         finger("ring", 13, (0.94, 0.96, 0.9), jitter(0.05))
         finger("pinky", 17, (0.95, 0.97, 0.9), jitter(0.05))
-        base = np.array([-0.58, -0.55]) + rng.uniform(-0.03, 0.03, 2)
+        base = np.array(
+            [-0.58 + jitter(0.03), -0.55 + jitter(0.03), 0.0]
+        )
         up_curls = (
             max(0.01 + jitter(0.03), 0.0),
             max(0.01 + jitter(0.03), 0.0),
@@ -144,7 +170,9 @@ def synthesize(gesture, rng):
         finger("middle", 9, (0.94, 0.97, 0.92), jitter(0.05))
         finger("ring", 13, (0.94, 0.96, 0.9), jitter(0.05))
         finger("pinky", 17, (0.95, 0.97, 0.9), jitter(0.05))
-        base = np.array([-0.32, -0.26]) + rng.uniform(-0.03, 0.03, 2)
+        base = np.array(
+            [-0.32 + jitter(0.03), -0.26 + jitter(0.03), 0.0]
+        )
         down_curls = (
             max(0.01 + jitter(0.03), 0.0),
             max(0.01 + jitter(0.03), 0.0),
@@ -154,7 +182,11 @@ def synthesize(gesture, rng):
         skel[2], skel[3], skel[4] = th[1], th[2], th[3]
     else:
         raise ValueError(gesture)
-    return np.stack(skel)
+    # Caminho único de ruído: deixar o augment() tratar o jitter isotrópico 3D.
+    out = np.stack([np.asarray(p, dtype=np.float64) for p in skel])
+    if out.shape != (21, 3):
+        raise AssertionError(f"sintese {gesture} -> {out.shape}, esperado (21,3)")
+    return out
 
 
 def augment(raw, rng):
@@ -162,32 +194,23 @@ def augment(raw, rng):
     n = len(pts)
     theta = rng.uniform(-np.pi, np.pi)
     cos, sin = np.cos(theta), np.sin(theta)
-    R = np.array([[cos, -sin], [sin, cos]])
-    pts = pts @ R.T
+    R2 = np.array([[cos, -sin], [sin, cos]])
+    pts[:, :2] = pts[:, :2] @ R2.T
     scale_px = max(rng.normal(150.0, 45.0), 20.0)
     origin = rng.uniform(-300, 300, 2)
-    pts = pts * scale_px + origin
+    pts[:, :2] = pts[:, :2] * scale_px + origin
 
     sigma = rng.choice([0.004, 0.012, 0.026, 0.05], p=[0.3, 0.35, 0.25, 0.1])
-    pts = pts + rng.normal(0.0, sigma * scale_px, (n, 2))
+    pts[:, :2] += rng.normal(0.0, sigma * scale_px, (n, 2))
+    pts[:, 2] += rng.normal(0.0, sigma * scale_px * 0.3, n)
 
     if rng.random() < 0.15:
         k = int(rng.integers(1, 4))
         idx = rng.choice(n, size=k, replace=False)
-        pts[idx] += rng.normal(0.0, 0.09 * scale_px, (k, 2))
+        pts[idx, :2] += rng.normal(0.0, 0.09 * scale_px, (k, 2))
 
-    wrist = pts[0]
-    v = pts[9] - wrist
-    s = np.hypot(v[0], v[1])
-    if s < 1e-6:
-        return None
-    ang = -np.arctan2(v[1], v[0])
-    c, si = np.cos(ang), np.sin(ang)
-    rel = pts[1:] - wrist
-    x = rel[:, 0] * c - rel[:, 1] * si
-    y = rel[:, 0] * si + rel[:, 1] * c
-    feat = np.concatenate([x / s, y / s])
-    if not np.all(np.isfinite(feat)):
+    feat = _normalize(pts)
+    if feat is None or not np.all(np.isfinite(feat)):
         return None
     return feat.astype(np.float32)
 
@@ -197,32 +220,24 @@ LABEL_NAMES = [g.name for g in CLASSES]
 
 
 def _to_feature(pts):
-    wrist = pts[0]
-    v = pts[9] - wrist
-    s = np.hypot(v[0], v[1])
-    if s < 1e-6:
-        return None
-    ang = -np.arctan2(v[1], v[0])
-    c, si = np.cos(ang), np.sin(ang)
-    rel = pts[1:] - wrist
-    x = rel[:, 0] * c - rel[:, 1] * si
-    y = rel[:, 0] * si + rel[:, 1] * c
-    feat = np.concatenate([x / s, y / s])
-    if not np.all(np.isfinite(feat)):
+    feat = _normalize(pts)
+    if feat is None or not np.all(np.isfinite(feat)):
         return None
     return feat.astype(np.float32)
 
 
 def jitter_real(pts, rng):
-    scale = float(np.hypot(*(pts[9] - pts[0])))
+    scale = float(np.hypot(pts[9, 0] - pts[0, 0], pts[9, 1] - pts[0, 1]))
     if scale < 1e-6:
         return None
     sigma = rng.choice([0.004, 0.010, 0.020], p=[0.4, 0.4, 0.2]) * scale
-    out = pts + rng.normal(0.0, sigma, pts.shape)
+    out = pts.copy()
+    out[:, :2] += rng.normal(0.0, sigma, (len(pts), 2))
+    out[:, 2] += rng.normal(0.0, sigma * 0.3, len(pts))
     if rng.random() < 0.10:
         k = int(rng.integers(1, 3))
         idx = rng.choice(len(pts), size=k, replace=False)
-        out[idx] += rng.normal(0.0, 0.07 * scale, (k, 2))
+        out[idx, :2] += rng.normal(0.0, 0.07 * scale, (k, 2))
     return out
 
 
@@ -240,8 +255,12 @@ def split_real(y, rng, val_frac=0.15):
 def load_real(path, min_per_class=30):
     data = np.load(path)
     X, y = data["X"].astype(np.float64), data["y"].astype(np.int64)
-    if X.ndim != 3 or X.shape[1:] != (21, 2):
-        raise ValueError(f"formato inesperado em {path}: X{X.shape} (esperado N x 21 x 2)")
+    if X.ndim != 3 or X.shape[1:] not in ((21, 2), (21, 3)):
+        raise ValueError(
+            f"formato inesperado em {path}: X{X.shape} (esperado N x 21 x 2|3)"
+        )
+    if X.shape[2] == 2:
+        X = np.concatenate([X, np.zeros((*X.shape[:2], 1), dtype=np.float64)], axis=2)
     counts = np.bincount(y, minlength=N_CLASSES)
     if (counts < min_per_class).any():
         raise ValueError(
@@ -307,8 +326,8 @@ def evaluate_runtime(net_params, trials=4000, seed=4242):
         f = augment(raw, vrng)
         if f is None:
             continue
-        px = np.zeros((21, 2))
-        px[1:] = np.column_stack([f[:20], f[20:]])
+        px = np.zeros((21, 3))
+        px[1:] = np.column_stack([f[:20], f[20:40], f[40:]])
         pg, pc = ai.classify(px)
         tested += 1
         if pg == g:

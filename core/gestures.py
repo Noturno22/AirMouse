@@ -74,6 +74,10 @@ class GestureEngine:
     def update(self, landmarks, width, height):
         cfg = self.cfg
         pts = [(lm[0] * width, lm[1] * height) for lm in landmarks]
+        if len(landmarks[0]) > 2:
+            pts3 = [(lm[0] * width, lm[1] * height, lm[2]) for lm in landmarks]
+        else:
+            pts3 = pts
         wrist = pts[0]
         scale = max(_dist(wrist, pts[9]), 1e-6)
         # racio 2D: fiável de frente para a câmara (os dedos sobrepõem-se na projeção)
@@ -247,7 +251,7 @@ class GestureEngine:
         raw = geo
         self.ai_conf = 0.0
         if self.ai is not None and not too_far:
-            ml_g, conf = self.ai.classify(pts)
+            ml_g, conf = self.ai.classify(pts3)
             self.ai_conf = conf
             if ml_g is not None and conf >= cfg.ai_confidence_min:
                 # a IA so pode confirmar o que a geometria tambem ve;
@@ -264,6 +268,7 @@ class GestureEngine:
                     or (ml_g == Gesture.THUMB_UP and thumb_up)
                     or (ml_g == Gesture.PINKY and pinky_only)
                     or (ml_g == Gesture.SHAKA and thumb_pinky)
+                    or (ml_g == Gesture.ROCK and geo == Gesture.ROCK)
                 )
                 geo_click = geo in (Gesture.PINCH, Gesture.PINCH_MID)
                 if ml_ok and not (geo_click and ml_g == Gesture.OPEN):
