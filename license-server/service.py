@@ -45,6 +45,23 @@ def get_current_nonce_helper(conn) -> int:
     return get_revocation_nonce(conn)
 
 
+from storage import get_trial, set_trial_used, TRIAL_MAX_SECONDS
+
+
+def trial_remaining(conn, machine_id: str) -> int:
+    row = get_trial(conn, machine_id)
+    used = row["used_seconds"] if row else 0
+    return max(0, TRIAL_MAX_SECONDS - used)
+
+
+def trial_report(conn, machine_id: str, used_seconds: int) -> int:
+    """Persiste o uso reportado (nunca diminui — ver storage.set_trial_used) e
+    devolve o restante."""
+    used_seconds = max(0, int(used_seconds))
+    set_trial_used(conn, machine_id, used_seconds)
+    return trial_remaining(conn, machine_id)
+
+
 def activate(conn, key: str, machine_id: str) -> tuple[str, str, int]:
     """Liga uma chave a uma máquina e emite um lease ES256.
 
