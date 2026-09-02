@@ -42,7 +42,7 @@ O sistema atual (`core/licensing.py`) tem falhas críticas:
 ┌──────────────────────────┐        HTTPS/JWT         ┌──────────────────────────────┐
 │    AirMouse Desktop      │ ◄──────────────────────► │  License Server (VPS)       │
 │  (cliente — câmara/voz)  │   activate / lease /     │  Node.js + Postgres/SQLite  │
-│  - fingerprint           │   heartbeat / trial      │  - emissão de chaves        │
+│  - fingerprint           │   revalidate / trial     │  - emissão de chaves        │
 │  - trial local (30min)   │                          │  - vínculo key↔machine      │
 │  - valida lease offline  │                          │  - trial server-side        │
 └──────────────────────────┘                          │  - webhook Paddle           │
@@ -76,30 +76,32 @@ Responsabilidades:
   é a fonte de verdade do trial, para que apagar o ficheiro local não reinicie
   os 30 min.
 - **Leases:** emitir um **lease assinado (JWT HS256, secret do servidor)** com
-  `exp` de **30 minutos** e mecanismos anti-burla (heartbeat + server_time,
-  revocation_nonce, session_id/use_seq) — ver desenho robusto §4.4. O lease curto
-  + heartbeat limitam a janela offline a poucos minutos: impossível usar o Pro
-  com uma licença revogada/expirada por longos períodos.
+  `exp` de **7 dias** e mecanismos anti-burla (server_time verificado,
+  revocation_nonce, session_id/use_seq) — ver desenho robusto §4.4. O lease
+  cobre o uso offline do pagante (revalidação 1x por semana) e limita a janela
+  máxima de "uso sem revalidação" de um burlão a 7 dias.
 - **Webhook Paddle:** confirmar pagamento e emitir a chave/licença
   automaticamente (transição de trial → ativado).
-- **Heartbeat:** endpoint para renovar o lease, devolver `server_time` assinado e
-  `revocation_nonce`, e atualizar `last_seen` (mantém §4.4 M1/M2).
+- **Revalidação periódica:** endpoint que renova o lease (devolvendo `server_time`
+  assinado e `revocation_nonce`) e atualiza `last_seen` (mantém §4.4 M1/M2).
 
-**Alta disponibilidade do servidor (essencial para zero-graça):**
-Como o cliente já não tolera offline (zero graça), o servidor tem de estar
-**praticamente sempre acessível** — caso contrário pune-se o utilizador legítimo:
+**Modelo de disponibilidade (o cliente funciona offline):**
+A solução aceita que o utilizador **pode não ter internet permanente**. O cliente
+**não** precisa de estar online para usar — só na **ativação inicial** e na
+**revalidação periódica (1x por semana)**. Como a revalidação é só semanal, o
+servidor não tem de ter disponibilidade 99.9% em tempo real; mesmo assim
+recomenda-se robustez mínima para que a revalidação não falhe por causa do nosso
+lado:
 
-- **Multi-região / edge**: implantar o License Server em múltiplas regiões
-  (ex.: Vercel/Fly edge) ou atrás de um CDN/load-balancer global.
-- **Failover automático**: o cliente mantém uma **lista de endpoints** e tenta o
-  seguinte quando o atual falha.
-- **Health checks** contínuos; se um endpoint cai, os pedidos migram
-  automaticamente.
-- **Armazenamento partilhado e consistente** entre regiões (Postgres gerido /
-  banco com replicação global), para o `machine_id`, trial e leases serem os
-  mesmos onde quer que o pedido chegue.
-- **Objectivo de disponibilidade**: ≥99.5% medida em pedidos recebidos, de modo
-  a que a "falta de servidor" seja um evento raro, não um argumento de burla.
+- **Replicação/backup** do storage para o `machine_id`, trial e leases sobreviverem
+  a falhas.
+- **Endpoints de failover** no cliente (lista de URLs) para o caso de um endpoint
+  estar temporariamente em baixo na hora de revalidar.
+- Evitar ponto único de falha simples (mínimo 2 instâncias / backups automáticos).
+
+Isto mantém o utilizador pago a funcionar offline até 7 dias sem penalização, ao
+mesmo tempo que garante que a janela de "revogação surtir efeito" é de no máximo
+1 semana.
 
 Endpoints propostos:
 
@@ -111,7 +113,7 @@ Endpoints propostos:
 | GET  | `/api/v1/lease` | Renova/obtém lease de Pro offline |
 | POST | `/api/v1/revoke` | Revoga máquina/chave |
 | POST | `/api/v1/webhook/paddle` | Ativação pós-pagamento |
-| POST | `/api/v1/heartbeat` | Heartbeat / renova lease |
+| GET  | `/api/v1/revalidate` | Revalidação periódica (1x/semana) — renova lease, devolve `server_time` + `revocation_nonce` |
 
 Segurança do servidor:
 
@@ -133,12 +135,14 @@ O `LicenseManager` é reescrito para:
 - **Guardar o lease** (JWT/assinatura do servidor) num ficheiro local assinado e
   verificar assinatura + `machine_id` + `exp` + `revocation_nonce` + `use_seq`
   antes de conceder Pro offline (ver desenho robusto §4.4).
-- **Heartbeat periódico** (~30–60 s) que renova o lease e reporta `last_seen`;
-  verifica o `server_time` devolvido contra o relógio local (anti-clock-skew).
-- **Failover de endpoints** (HA): guarda uma lista de endpoints do servidor e
-  tenta o seguinte quando o atual falha; bloqueia só se todos falharem.
-- **Zero-graça offline**: não arranca nem continua sem contactar o servidor —
-  bloqueio imediato se o heartbeat/heartbeat de arranque falhar (ver §4.4 M1).
+- **Uso offline normal:** após a ativação inicial, o utilizador pago funciona
+  sem internet — o lease local válido é a prova de licença. Não bloqueia por
+  falta de conexão, apenas se o lease tiver expirado.
+- **Revalidação periódica (1x por semana):** quando há internet, o cliente
+  tenta renovar o lease (~a cada 7 dias). Se conseguir, tem mais 7 dias. Se não,
+  continua offline até o lease expirar; só então pede ligação para renovar.
+- **Failover de endpoints:** guarda uma lista de endpoints do servidor e tenta o
+  seguinte quando o atual falha na hora de ativar/revalidar.
 - **Bloqueio total** quando trial expira ou lease expira sem renovação: mostra o
   pop-up apelativo de ativação e não permite usar o AirMouse (nem move/click).
 
@@ -166,44 +170,47 @@ porque o `machine_id` não bate com o registado no servidor.
 
 ### 4.4 Desenho robusto do lease (melhorado)
 
-O lease é o coração da segurança. O design anterior (JWT com `exp` de 30 min)
-era fraco por três motivos — um utilizador determinado podia:
+O lease é o coração da segurança. O ponto-chave da solução é que **o pagante
+funciona offline** — por isso não se usa "estar online" para distinguir burlão.
+O que distingue pagante de burlão é um **lease local criptograficamente válido**
+(assinado pelo servidor + `machine_id` correto + campos anti-replay). Sem um
+lease válido, ninguém usa Pro, esteja online ou não.
+
+O lease **melhorado** resolve quatro ataques:
 
 1. **Congelar o relógio** do PC → o `exp` nunca chega, o Pro dura para sempre.
 2. **Guardar/reutilizar o lease** (ou um snapshot do `license.json`) para se
    manter Pro offline indefinidamente.
-3. **Não haver revogação imediata** — uma revogação só surtiria efeito no
-   próximo heartbeat (até 30 min).
+3. **Reutilizar a mesma chave noutra máquina** (cópia/clone).
+4. **Não haver revogação** — uma revogação tem de surtir efeito num prazo
+   aceitável.
 
-O lease **melhorado** resolve isto combinando três mecanismos:
+Mecanismos (M1–M3):
 
-#### M1 — Heartbeat + relógio verificado (estrito, zero-graça)
-- O cliente envia heartbeat ao servidor em intervalos curtos (ex.: **30–60 s**).
-- O servidor responde com um **`server_time` assinado**. O cliente compara o
-  relógio local com o `server_time`: se o relógio local divergir muito (clock
-  skew > tolerância, ex.: ±10 min), o lease é **invalidado** e exige reativação.
-- O lease não é apenas temporal: guarda também **contador de atividade** e o
-  cliente prova atividade regular via heartbeat. Estar "offline com relógio
-  congelado" deixa de funcionar porque o servidor marca o `last_seen` e anula o
-  lease quando o cliente deixa de aparecer.
-- **Zero-graça offline:** o cliente **não tolera offline**. Se o heartbeat
-  falhar (ou se não haver servidor atingível no arranque), o AirMouse **bloqueia
-  imediatamente** — sem período de graça. Em vez de o cliente "aguentar" quedas
-  de rede (o que dava a janela de 2–3 min ao reincidente), a disponibilidade é
-  garantida pelo **servidor de alta disponibilidade** (multi-região + failover,
-  §4.1). O utilizador legítimo com falha de rede momentânea é raro e remediado
-  pela HA do servidor; o reincidente que bloqueia o servidor ganha **0 segundos**
-  porque o cliente pára sem servidor.
+#### M1 — Lease temporal + relógio verificado (offline-friendly)
+- O servidor emite um lease com `exp` de **7 dias** (alinhado com a revalidação
+  semanal). Durante esses 7 dias, o utilizador **funciona offline** — o lease
+  local é a prova de licença. Não há heartbeat por segundo; a revalidação é
+  **1x por semana** quando há internet.
+- O servidor devolve um **`server_time` assinado** a cada renovação. O cliente
+  compara o relógio local com esse `server_time`: se o relógio divergir mais que
+  a tolerância (ex.: ±10 min), o lease é **invalidado** (anti-congelar relógio).
+- O lease inclui `nbf` + `exp` com margem; o servidor regista `last_seen` por
+  máquina e rejeita renovações cujos timestamps impliquem saltos de relógio.
+- **Ao expirar o lease sem renovação** (7 dias sem internet / sem renovar), o
+  cliente **bloqueia** e pede ligação -> isto limita o tempo máximo de "uso sem
+  revalidação" a 7 dias, mesmo para o burlão que tente isolar o servidor.
 
 #### M2 — Nonce de revogação server-side (stateless revocation)
 - O servidor mantém um **número de revogação global** (`revocation_nonce`) que
   incrementa sempre que QUALQUER licença é revogada/expira forçosamente.
 - Cada lease emitido embute o valor corrente de `revocation_nonce`.
-- O heartbeat devolve o nonce corrente ao cliente.
-- **Regra:** um lease com `revocation_nonce < nonce_atual` é **inválido à primeira
-  falha de heartbeat** — o cliente, ao reconectar, descobre que o seu lease está
-  obsoleto mesmo sem o servidor lhe apontar a chave individual. Leases antigos
-  são anulados globalmente quando o servidor volta a estar online.
+- A revalidação devolve o nonce corrente ao cliente.
+- **Regra:** um lease com `revocation_nonce` inferior ao nonce corrente é
+  **inválido na próxima revalidação** — o cliente ao reconectar descobre que o
+  lease está obsoleto sem o servidor apontar a chave individual. Associado à exp
+  de 7 dias, isto garante que uma revogação surte efeito em **no máximo 7 dias**
+  (limite da janela de "graça" de um burlão que isole o servidor).
 
 #### M3 — Anti-clock-skew + anti-snapshot
 - **Anti-clock-skew:** além de comparar com `server_time`, o lease usa `nbf` +
@@ -226,28 +233,40 @@ O lease **melhorado** resolve isto combinando três mecanismos:
   "revocation_nonce": 7,            // valor corrente no servidor
   "iat": 1756820000,
   "nbf": 1756817000,
-  "exp": 1756821800,                // +30 min
+  "exp": 1757424800,                // +7 dias (revalidação semanal)
   "server_time": 1756818800        // relógio do servidor no momento
 }
 ```
 
 #### Regras de decisão no cliente (são: gate de bloqueio)
-- Lease válido (assinatura + `machine_id` + `exp` + nonce + seq OK) **e**
-  servidor atingível → **Pro liberto**.
-- Qualquer falha de contacto com o servidor (arranque ou heartbeat) →
-  **bloqueio imediato, zero graça**. O cliente tenta os endpoints de failover
-  (HA) e, se nenhum responder, pára.
-- Lease expirado / nonce obsoleto / relógio divergente / seq repetido →
-  **bloqueio total** + pedido de reativação/heartbeat.
+- **Uso offline normal:** o cliente **não exige servidor**. Se o lease local é
+  válido (assinatura + `machine_id` + `exp` não expirado + nonce + seq OK), o
+  utilizador usa Pro **mesmo offline**. (É assim que o pagante sem internet
+  continua a usar.)
+- **Revalidação (1x/semana, com internet):** quando há conexão, o cliente tenta
+  renovar. Sucesso → novo lease de 7 dias. Falha de rede → continua com o lease
+  atual até expirar.
+- **Bloqueio (apenas se):**
+  - lease expirado (`exp` passado) e sem conseguir renovar → bloqueia e pede
+    ligação;
+  - lease com assinatura inválida / `machine_id` errado / nonce obsoleto / seq
+    repetido → bloqueia.
+- O burlão **sem lease válido** (chave clonada noutra máquina, snapshot antigo,
+  relógio congelado) **nunca** entra — falha sempre a validação local do lease.
 
 **Resultado:** com `server_time` verificado, `revocation_nonce`, `session_id` +
-`use_seq` antireplay, **zero graça offline** e servidor de alta disponibilidade,
-nenhum dos ataques (relógio congelado, snapshot, falta de revogação, isolar o
-servidor) sobrevive. O pior cenário para um reincidente é **0 segundos** de uso
-Pro não pago: sem contacto com o servidor, o cliente bloqueia logo. A
-compensação para o utilizador legítimo é a **disponibilidade ≥99.5%** do servidor
-e o **failover** entre endpoints, garantindo que a ausência de servidor é um
-evento raro — não um benefício para burla.
+`use_seq` antireplay e `exp` de 7 dias, nenhum ataque sobrevive:
+- Congelar o relógio → detetado pelo `server_time` verificado (M1) → bloqueia.
+- Snapshot/backup do lease → `use_seq` replay detetado (M3) → bloqueia.
+- Clonar a chave noutra máquina → `machine_id` não corresponde (M3) → bloqueia.
+- Reincidente que isole o servidor → no máximo mantém o lease válido expirado em
+  7 dias; sem renovação, bloqueia.
+
+O pagante usa offline sem penalização dentro dos 7 dias do lease. O **pior
+cenário para um reincidente** é usar o lease já emitido por até **7 dias** sem
+renovar — e nunca além disso; para continuar a burlar teria de obter uma nova
+chave paga. Este é um equilíbrio pro: segurança forte + boa experiência para o
+cliente pago.
 
 ## 5. Fluxo de utilizador (happy path)
 
@@ -257,24 +276,29 @@ evento raro — não um benefício para burla.
 3. Trial expira → bloqueio total + pop-up: "A tua experiência Free terminou" com
    botões para os planos (Lifetime €39,90 / Sub €4,99 / Família / Access).
 4. User compra via Paddle → webhook ativa a licença no servidor.
-5. User recebe a chave → cola no AirMouse → `activate` liga `key↔machine_id`.
-6. Cliente guarda o lease e usa Pro (lease de 30 min, ver §4.4).
-7. O **heartbeat (~30–60 s)** renova o lease e mantém o Pro vivo enquanto há
-   contacto com o servidor. Se o servidor se tornar inalcançável (todos os
-   endpoints de failover falharem), há **bloqueio imediato, zero graça** (com
-   aviso a pedir ligação) — ver §4.4 M1.
+5. User recebe a chave → cola no AirMouse → `activate` liga `key↔machine_id`
+   (ativação online, única vez obrigatória).
+6. Cliente guarda o lease e passa a usar Pro **normalmente, offline se quiser**
+   (lease válido 7 dias, ver §4.4).
+7. **Revalidação 1x por semana:** quando houver internet, o cliente renova o
+   lease (mais 7 dias). Sem internet, continua a usar até o lease expirar; ao
+   expirar sem renovar → bloqueio + pedido de ligação (ver §4.4 M1).
 8. Tentativa de usar a **mesma chave noutra máquina** → servidor rejeita
    (`machine_id` não corresponde ao vinculado). Aparece erro claro.
 
 ## 6. Tratamento de erros e casos edge
 
-- **Offline no arranque, sem servidor atingível (nem failover)** → **bloqueio
-  imediato** (mensagem a pedir ligação). Não concede uso se não for possível
-  provar a licença.
-- **Perda de conexão durante uso** → o heartbeat falha; após tentar todos os
-  endpoints de failover sem resposta → **bloqueio imediato, zero graça** (§4.4 M1).
-- **Clock do utilizador adiantado/atrasado** → `exp` verificado com `nbf`/margem
-  E comparado com o `server_time` assinado do servidor (§4.4 M1).
+- **Offline no arranque com lease local válido** → **usa normalmente** (lease é a
+  prova de licença; não exige servidor).
+- **Offline no arranque sem lease válido** → **bloqueio** (mensagem a pedir
+  ligação para ativar/renovar). Não concede uso sem licença provada.
+- **Perda de conexão durante o uso** → continua a usar até o lease expirar; na
+  revalidação seguinte (ou em vez disso, quando tentar renovar), se falhar, só
+  bloqueia no termo do lease (§4.4 M1).
+- **Lease expirado (7 dias) sem renovação** → **bloqueio** + pedido de ligação.
+- **Clock do utilizador adiantado/atrasado (congelar relógio)** → `exp` verificado
+  com `nbf`/margem e comparado com `server_time` assinado do servidor → invalida
+  o lease (§4.4 M1).
 - **Snapshot antigo do lease restaurado** → `session_id`/`use_seq` repetido →
   replay rejeitado, reativação obrigatória (§4.4 M3).
 - **Apagar `license.json` / reinstalar** → trial não reinicia (servidor é a fonte
@@ -293,14 +317,16 @@ evento raro — não um benefício para burla.
 - Chave reutilizada noutro `machine_id` → rejeitada.
 - Trial: contagem de uso real; não reinicia ao apagar ficheiro local.
 - Lease expirado/corrompido → bloqueio total (não concede Pro).
+- **Uso offline com lease válido → FUNCIONA (sem exigir servidor)** (M1).
 - **Lease com `revocation_nonce` obsoleto → bloqueio** (M2).
 - **Lease com `use_seq` repetido (replay/snapshot) → bloqueio** (M3).
 - **Relógio local divergente do `server_time` (clock skew) → bloqueio/reativação**
   (M1).
-- **Qualquer falha de heartbeat (arranque ou durante uso, todos os endpoints de
-  failover esgotados) → bloqueio imediato, zero graça** (M1).
-- **Failover: endpoint primário cai → cliente tenta os seguintes com sucesso** (HA).
-- Offline sem lease → bloqueio com mensagem.
+- **Revalidação semanal: com internet renova (+7 dias); sem internet continua até
+  expirar; expirado sem renovar → bloqueio** (M1).
+- **Failover: endpoint primário falha na revalidação → cliente tenta os seguintes
+  com sucesso** (§4.1).
+- Offline sem lease válido → bloqueio com mensagem.
 - `--dev-pro` ausente/neutro → sem bypass.
 
 ### Servidor (pytest/vitest)
@@ -308,12 +334,13 @@ evento raro — não um benefício para burla.
 - Segunda ativação noutra máquina → 409/403.
 - Trial server-side idempotente (não reinicia).
 - Webhook Paddle assinado ativa licença.
-- Leases expiram e renovam.
-- **`revocation_nonce` incrementa em revogação e anula leases antigos** (M2).
+- Leases expiram (7 dias) e renovam (mais 7 dias).
+- **`revocation_nonce` incrementa em revogação e anula leases antigos na próxima
+  revalidação** (M2).
 - **`session_id`/`use_seq` repetidos são detetados e rejeitados** (M3).
-- **`server_time` assinado é devolvido; heartbeat atualiza `last_seen`** (M1).
-- **Estado partilhado/consistente entre regiões (machine_id, trial, leases)** (HA).
-- **Health check e migração de pedidos quando uma região cai** (HA).
+- **`server_time` assinado é devolvido na revalidação; `last_seen` atualizado** (M1).
+- **Revalidação offline do cliente com lease válido não depende de estado
+  regional** (dados partilhados por `machine_id`).
 
 ### Segurança / penetração (manual, checklist)
 - Copiar `license.json`+binário para outro PC → bloqueado (fingerprint diff).
@@ -321,10 +348,12 @@ evento raro — não um benefício para burla.
 - **Congelar o relógio do PC → clock-skew deteta e bloqueia** (M1).
 - **Guardar/restaurar um snapshot antigo do lease → `use_seq` replay rejeitado**
   (M3).
-- **Banir/bloquear TODOS os endpoints do servidor via firewall num PC clonado →
-  cliente bloqueia em 0s** (M1 + HA).
-- **Derrubar uma região → failover migra para outra, licença continua a validar**
-  (HA).
+- **Clonar chave/lease para outra máquina e bloquear o servidor via firewall →
+  o clone nunca valida (machine_id) → bloqueado logo** (M3).
+- **Sustentar o clone online por muito tempo → a exp de 7 dias expira sem
+  renovação → bloqueio** (M1).
+- **Servidor temporariamente fora na revalidação → o pagante com lease válido
+  mantém uso até renovar** (§4.1).
 - Brute-force de chave → rate-limit / logout.
 - Reverter relógio → não estende trial/lease.
 
@@ -347,19 +376,23 @@ evento raro — não um benefício para burla.
 ## 10. Decisões a fechar durante implementação
 
 - Stack do servidor: **FastAPI (Python)** recomendado por coerência com o projeto.
-- Duração do lease offline: **30 minutos** (curto — limita a janela offline e
-  obriga a revalidação frequente com o servidor).
-- **Heartbeat:** intervalos de **~30–60 s**; **zero graça offline** (bloqueio
-  imediato sem contacto com o servidor, ver §4.4 M1).
-- **Alta disponibilidade:** multi-região/edge + failover entre endpoints;
-  objetivo de disponibilidade ≥99.5% (§4.1).
+- **Validação online:** obrigatória na **ativação inicial** (liga a chave à
+  máquina) e na **revalidação periódica**; o uso seguinte é **offline**.
+- **Duração do lease (revalidação):** **7 dias** — o utilizador pago funciona
+  offline dentro do lease; renova 1x por semana quando há internet (§4.4 M1).
+- **Sem zero-graça/online-strict:** o cliente usa offline com lease válido; só
+  bloqueia se o lease expirar sem renovar ou se for inválido (§4.4).
+- **Revalidação:** automática quando há internet (~a cada 7 dias); tentativa de
+  renovação silenciosa.
+- **Robustez do servidor:** backups/replicasção e failover de endpoints para a
+  revalidação não falhar por causa do nosso lado (§4.1).
 - **Clock-skew tolerância:** ±10 min entre relógio local e `server_time` (M1).
-- Storage: **SQLite** suficiente para 1 pessoa/start; migrar para Postgres
-  replicado entre regiões se escalar (para a HA).
+- Storage: **SQLite** suficiente para 1 pessoa/start; migrar para Postgres com
+  réplicas se escalar.
 - Formato do lease: **JWT HS256** assinado com secret do servidor.
 
 ---
 
-*Este design segue a Abordagem B (híbrida) aprovada: validação online na
-ativação/renovação, lease offline de 30 minutos, com a regra dura
+*Este design segue a Abordagem B (híbrida) aprovada: ativação online única + uso
+offline, revalidação 1x por semana (lease de 7 dias), regra dura
 1 chave = 1 utilizador = 1 máquina e trial Free de 30 min com bloqueio total.*
