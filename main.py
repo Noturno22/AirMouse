@@ -25,7 +25,13 @@ from core.camera import CameraStream
 from core.commands import AppCtl, apply_command
 from core.engine import run_loop
 from core.gesture_ai import GestureAI, ensure_ai_model
-from core.licensing import LicenseManager
+from core.licensing import (
+    LicenseManager,
+    Tier,
+    entitlements,
+    is_pro_locked,
+    set_active_license,
+)
 from core.log import get_logger, setup_logging
 from core.mouse_ctl import MouseCtl
 from core.snap import SnapEngine
@@ -80,6 +86,12 @@ def parse_args():
         "--deactivate",
         action="store_true",
         help="remove a licenca Pro (volta a Free) e sai.",
+    )
+    parser.add_argument(
+        "--dev-pro",
+        action="store_true",
+        help="DEV: desbloqueia todas as funcionalidades Pro SEM chave "
+             "(apenas em desenvolvimento; nunca usar no executável).",
     )
     return parser.parse_args()
 
@@ -139,6 +151,7 @@ def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, spea
         return None
 
     app = QApplication.instance() or QApplication([])
+    app.setStyle("Fusion")
     window = MainWindow(
         cfg, cam, tracker, mouse, gesture_ai=gesture_ai, voice=voice,
         tuner=tuner, speaker=speaker, snap=snap,
@@ -148,7 +161,7 @@ def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, spea
     window.setWindowTitle("AirMouse")
     window.resize(900, 640)
     # Arranca OCULTA: a interface so aparece com o comando gui_toggle
-    # (abrir/fechar a mao esquerda 3x). Serve apenas para configuracao.
+    # (gesto de paz com a mao esquerda). Serve apenas para configuracao.
     window.hide()
 
     # Ctrl+C na consola fecha a janela de forma limpa (sem interromper o
@@ -176,11 +189,20 @@ def main():
     cfg = Config()
     cfg.selftest_frames = args.frames
 
-    # Licenciamento: cria o gestor, carrega o estado persistido e aplica o gate
-    # Free/Pro ANTES de inicializar serviços (para não arrancar voz/snap/... no Free).
+    # Licenciamento: cria o gestor e carrega o estado persistido. O gate
+    # Free/Pro é aplicado APÓS load_settings (ver abaixo).
     lic_ = LicenseManager()
     lic_.load()
     cfg.license_tier = lic_.tier.value
+
+    # MODO DEV (apenas desenvolvimento): --dev-pro ou AIRMOUSE_DEV_PRO=1 força
+    # o modo Pro completo SEM precisar de chave. Nunca ativamente num
+    # executável/packaging final — só corre quando o dev o liga explicitamente.
+    dev_pro = args.dev_pro or os.getenv("AIRMOUSE_DEV_PRO") == "1"
+    if dev_pro:
+        lic_.tier = Tier.PRO
+        cfg.license_tier = Tier.PRO.value
+        log.warning("MODO DEV-PRO ATIVO: funcionalidades Pro desbloqueadas sem chave.")
 
     # Ações CLI de licença (retornam imediatamente).
     if args.activate_key:
@@ -195,23 +217,6 @@ def main():
         print("Licença removida (modo Free ativo).")
         return 0
 
-    # Gate Free/Pro: no tier Free, desligam-se as funcionalidades Pro-locked
-    # independentemente de settings.json (o gate manda).
-    from core.licensing import entitlements as _ent
-    ent = _ent(lic_.tier)
-    cfg.snap_enabled = cfg.snap_enabled and ent["snap"]
-    cfg.voice_enabled = cfg.voice_enabled and ent["voice"]
-    cfg.tts_enabled = cfg.tts_enabled and ent["tts"]
-    cfg.ai_enabled = cfg.ai_enabled and ent["ai"]
-    cfg.autotune_enabled = cfg.autotune_enabled and ent["autotune"]
-    cfg.low_light_boost = cfg.low_light_boost and ent["low_light"]
-    cfg.magnifier_enabled = cfg.magnifier_enabled and ent["two_hands"]
-    cfg.clap_enabled = cfg.clap_enabled and ent["two_hands"]
-    cfg.left_hand_commands = cfg.left_hand_commands and ent["two_hands"]
-    cfg.num_hands = 2 if ent["two_hands"] else 1
-
-    log.info("License: %s", "PRO" if lic_.is_pro else "FREE")
-
     mutex = acquire_single_instance()
     if mutex is None:
         log.info("AirMouse ja esta em execucao.")
@@ -225,6 +230,27 @@ def main():
         except Exception:
             pass
     smooth_idx = load_settings(cfg)
+
+    # Gate Free/Pro — aplicado APÓS load_settings para que os settings do disco
+    # NÃO reativem funcionalidades Pro-locked no Free (bug: voice_enabled=true
+    # nos settings reativava a voz no Free). No Free, as features Pro-locked
+    # ficam desligadas independentemente do que estiver guardado.
+    set_active_license(lic_)
+    ent = entitlements(lic_.tier)
+    cfg.snap_enabled = cfg.snap_enabled and not is_pro_locked(lic_.tier, "snap")
+    cfg.voice_enabled = cfg.voice_enabled and not is_pro_locked(lic_.tier, "voice")
+    cfg.tts_enabled = cfg.tts_enabled and not is_pro_locked(lic_.tier, "tts")
+    cfg.ai_enabled = cfg.ai_enabled and ent["ai"]
+    cfg.autotune_enabled = cfg.autotune_enabled and ent["autotune"]
+    cfg.low_light_boost = cfg.low_light_boost and ent["low_light"]
+    cfg.magnifier_enabled = cfg.magnifier_enabled and ent["two_hands"]
+    cfg.clap_enabled = cfg.clap_enabled and ent["two_hands"]
+    cfg.left_hand_commands = cfg.left_hand_commands and ent["two_hands"]
+    # Deteta SEMPRE ate 2 maos (para a UI poder mostrar "2 maos" tambem no
+    # Free); o que fica bloqueado sao os RECURSOS de 2 maos, nao a deteccao.
+    cfg.num_hands = 2
+
+    log.info("License: %s", "PRO" if lic_.is_pro else "FREE")
 
     if args.camera is not None:
         cfg.camera_index = args.camera

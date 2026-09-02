@@ -5,13 +5,16 @@ movimento/gestos vive em ``process_frame``/``make_engine_ctx`` (main.py),
 partilhada com o preview OpenCV. Isto garante paridade total de comportamento
 entre as duas UIs.
 """
+import os
 import time
 
 import cv2
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QMainWindow, QWidget
 
 from config import SMOOTH_PRESETS, save_settings
+from i18n import I18N, tr
 from core.gestures import Gesture
 from ui.camera_view import CameraView
 from ui.gesture_badge import GestureBadge
@@ -29,6 +32,10 @@ from ui.voice_bar import VoiceBar
 
 
 class MainWindow(QMainWindow):
+
+    # Emitido da thread do pynput (hotkey global); ligado a um slot do GUI
+    # thread para o toggle ser processado com seguranca em Qt.
+    hotkey_toggle = Signal()
 
     def __init__(self, cfg, cam, tracker, mouse, gesture_ai=None,
                  voice=None, tuner=None, speaker=None, snap=None,
@@ -68,6 +75,9 @@ class MainWindow(QMainWindow):
         # continua sempre a correr em segundo plano.
         self._camera_on = False
 
+        # Aviso "2 maos = premium" mostra uma unica vez por subida do contador.
+        self._twohand_free_notified = False
+
         self._E = None
         self._ctx = None
         self._state = {}
@@ -76,6 +86,7 @@ class MainWindow(QMainWindow):
         self._build_shortcuts()
         self._start_global_hotkey()
         self._sync_license_ui()
+        I18N.language_changed.connect(lambda *_: self._sync_toolbar())
 
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
@@ -93,15 +104,11 @@ class MainWindow(QMainWindow):
         central.setObjectName("MainWindow")
         self.setCentralWidget(central)
 
-        # Painel de marca central (dashboard). O feed da câmara não é o fundo:
-        # a janela é um painel de controlo limpo; a câmara é um preview opcional.
-        self._brand = QLabel(central)
-        self._brand.setObjectName("DashboardBrand")
-        self._brand.setAlignment(Qt.AlignCenter)
-        self._brand.setText(
-            "<span style='font-size:44px;font-weight:bold;color:#50C8FF;'>MÃOUSE</span>"
-            "<br><span style='font-size:16px;color:#969696;'>Controlo do rato por gestos</span>"
-        )
+        self._bg = QLabel(central)
+        self._bg.setObjectName("DashboardBackground")
+        self._bg.setGeometry(0, 0, self.width(), self.height())
+        self._bg.lower()
+        self._load_bg_image()
 
         self._cam_view = CameraView(central)
         self._cam_view.setObjectName("CameraPreview")
@@ -118,15 +125,6 @@ class MainWindow(QMainWindow):
         self._status.resize(300, 28)
 
         self._toast = Toast(central)
-
-        # Watermark da versão Free (demo). Some quando ativa Pro.
-        self._watermark = QLabel(central)
-        self._watermark.setObjectName("Watermark")
-        self._watermark.setText("MÃouse FREE")
-        self._watermark.setStyleSheet(
-            "color:#50C8FF;font-family:Consolas;font-size:11px;"
-            "letter-spacing:1px;background:transparent;"
-        )
 
         self._help = HelpPanel(central)
         self._help.move(12, 120)
@@ -147,6 +145,38 @@ class MainWindow(QMainWindow):
 
         self._build_menu()
         self._build_shortcuts()
+
+    def _load_bg_image(self):
+        try:
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            path = os.path.join(root, "assets", "brand", "logo.png")
+            pm = QPixmap(str(path))
+            if not pm.isNull():
+                self._bg.setPixmap(pm)
+                self._fit_bg(self.width(), self.height())
+        except Exception:
+            self._bg.setPixmap(QPixmap())
+
+    def _fit_bg(self, w, h):
+        if self._bg is None or w <= 0 or h <= 0:
+            return
+        pm = self._bg.pixmap()
+        if pm is None or pm.isNull():
+            return
+        try:
+            ratio = 0.7
+            target_w = min(int(min(w, h) * ratio), 430)
+            scaled = pm.scaled(
+                target_w, target_w,
+                Qt.KeepAspectRatio, Qt.SmoothTransformation,
+            )
+        except Exception:
+            scaled = pm
+        x = (w - scaled.width()) // 2
+        y = (h - scaled.height()) // 2
+        self._bg.setGeometry(x, y, scaled.width(), scaled.height())
+        self._bg.setPixmap(scaled)
+        self._bg.lower()
 
     def _build_menu(self):
         """Painel lateral de marca com botões agrupados (topo-direito)."""
@@ -189,8 +219,7 @@ class MainWindow(QMainWindow):
                     # caractere de controlo '\x01'. Aceitamos as duas formas.
                     ch = getattr(key, "char", None)
                     if ch in ("a", "A", "\x01") and {"ctrl", "shift"} <= pressed:
-                        from PySide6.QtCore import QTimer
-                        QTimer.singleShot(0, self._toggle_ui_global)
+                        self.hotkey_toggle.emit()
             except Exception:
                 pass
 
@@ -204,6 +233,7 @@ class MainWindow(QMainWindow):
                 pass
 
         try:
+            self.hotkey_toggle.connect(self._toggle_ui_global)
             self._hotkey_listener = keyboard.Listener(
                 on_press=on_press, on_release=on_release, daemon=True
             )
@@ -215,9 +245,7 @@ class MainWindow(QMainWindow):
         if self._E is None:
             return
         self._E.ui["ui_show"] = not self._E.ui["ui_show"]
-        self._toast.show_toast(
-            "INTERFACE ON" if self._E.ui["ui_show"] else "INTERFACE OFF"
-        )
+        self._toast.show_toast(tr("toast.ui_on" if self._E.ui["ui_show"] else "toast.ui_off"))
 
 
     def _menu_checkable(self, btn, checked):
@@ -235,10 +263,22 @@ class MainWindow(QMainWindow):
             self._E.emitter.clear()
         self._state["paused"] = paused
         self._paused = paused
-        self._menu.btn_pause.setText("⏸  PAUSA" if not paused else "▶  RETOMAR")
-        self._toast.show_toast("PAUSA" if paused else "RETOMAR")
+        self._menu.btn_pause.set_key("btn.resume" if paused else "btn.pause")
+        self._toast.show_toast(tr("toast.pause" if paused else "toast.resume"))
+
+    def _view_license_locked(self, feature: str) -> bool:
+        """True se a funcionalidade estiver Pro-locked (não deve ligar no Free)."""
+        try:
+            from core.licensing import active_tier, is_pro_locked
+            return is_pro_locked(active_tier(), feature)
+        except Exception:
+            return False
 
     def _toggle_voice(self, checked):
+        if self._view_license_locked("voice"):
+            self._toast.show_toast("VOZ disponível no PRO — UPGRADE PRO")
+            self._menu_checkable(self._menu.btn_voice, False)
+            return
         if self._voice:
             self._voice.toggle()
             on = self._voice.status != "off"
@@ -246,6 +286,10 @@ class MainWindow(QMainWindow):
             self._toast.show_toast(f"VOZ {'ON' if on else 'OFF'}")
 
     def _toggle_snap(self, checked):
+        if self._view_license_locked("snap"):
+            self._toast.show_toast("SNAP disponível no PRO — UPGRADE PRO")
+            self._menu_checkable(self._menu.btn_snap, False)
+            return
         if self._snap and self._snap.available:
             self._snap.enabled = checked
             self._cfg.snap_enabled = checked
@@ -260,12 +304,11 @@ class MainWindow(QMainWindow):
         afetado: o rastreio continua a correr em segundo plano o tempo todo."""
         self._camera_on = checked
         self._cam_view.setVisible(checked)
-        self._brand.setVisible(not checked)
         self._layout_camera()
         self._toast.show_toast("CÂMARA ON" if checked else "CÂMARA OFF")
 
     def _sync_toolbar(self):
-        self._menu.btn_pause.setText("⏸  PAUSA" if not self._paused else "▶  RETOMAR")
+        self._menu.btn_pause.set_key("btn.resume" if self._paused else "btn.pause")
         self._menu_checkable(
             self._menu.btn_voice, bool(self._voice) and self._voice.status != "off",
         )
@@ -289,7 +332,9 @@ class MainWindow(QMainWindow):
         elif key == Qt.Key_V:
             self._toggle_voice(None)
         elif key == Qt.Key_M:
-            if self._snap and self._snap.available:
+            if self._view_license_locked("snap"):
+                self._toast.show_toast("SNAP disponível no PRO — UPGRADE PRO")
+            elif self._snap and self._snap.available:
                 new_state = not self._snap.enabled
                 self._snap.enabled = new_state
                 self._cfg.snap_enabled = new_state
@@ -349,22 +394,18 @@ class MainWindow(QMainWindow):
     def _sync_license_ui(self):
         """Atualiza a UI consoante o estado da licença (Free vs Pro)."""
         is_pro = bool(self._license and self._license.is_pro)
-        self._menu.btn_upgrade.setText("✔  PRO ATIVO" if is_pro else "★  UPGRADE PRO")
+        self._menu.btn_upgrade.setText("✔  PRO ATIVO" if is_pro else "UPGRADE PRO")
         self._menu.btn_upgrade.setEnabled(not is_pro)
-        self._watermark.setVisible(not is_pro)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w, h = self.width(), self.height()
-        self._brand.setGeometry(0, int(h * 0.32), w, int(h * 0.36))
         self._layout_camera()
+        self._fit_bg(w, h)
         self._status.move(w - 310, 10)
         self._status.resize(300, 28)
         self._status_bar.setGeometry(0, h - 22, w, 22)
         self._fps_lbl.setGeometry(w - 100, h - 22, 90, 22)
-        wm = self._watermark
-        wm.adjustSize()
-        wm.move((w - wm.width()) // 2, h - 34)
         tw = self._toast.width() if self._toast.width() > 0 else 200
         self._toast.move((w - tw) // 2, 50)
 
@@ -480,12 +521,7 @@ class MainWindow(QMainWindow):
         engine_paused = bool(self._state.get("paused", self._paused))
         if engine_paused != self._paused:
             self._paused = engine_paused
-            if self._menu.btn_pause.text() != (
-                "⏸  PAUSA" if not engine_paused else "▶  RETOMAR"
-            ):
-                self._menu.btn_pause.setText(
-                    "⏸  PAUSA" if not engine_paused else "▶  RETOMAR"
-                )
+            self._menu.btn_pause.set_key("btn.resume" if engine_paused else "btn.pause")
         self._gesture_badge.update_gesture(gesture, engine_paused)
         if self._camera_on:
             self._cam_view.update_frame(frame, all_frames, active_side, self._flash)
@@ -494,6 +530,16 @@ class MainWindow(QMainWindow):
         hands = len(all_frames)
         magnify = self._magnifier.last_action if (self._magnifier and self._magnifier.on) else ""
         self._status.update_state(self._gesture_ai is not None, ai_conf, magnify, hands)
+
+        # No Free, duas maos sao DETETADAS e mostradas, mas os recursos de 2
+        # maos ficam bloqueados pelo gate de licenca. Avisar o utilizador uma
+        # vez por subida do contador (premium).
+        is_pro = bool(self._license and self._license.is_pro)
+        if not is_pro and hands >= 2 and not self._twohand_free_notified:
+            self._twohand_free_notified = True
+            self._toast.show_toast("2 MÃOS DETETADAS · RECURSOS PRO LOCKED")
+        if hands < 2:
+            self._twohand_free_notified = False
 
         if self._voice:
             self._voice_bar.update_state(self._voice.status, self._cfg.voice_wake_word)

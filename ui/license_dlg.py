@@ -1,12 +1,16 @@
 """Upgrade / License dialog for Mãouse.
 
-Mostra as opções Pro (Lifetime / Subscrição / Família) com os preços do
-modelo de negócio, lança o checkout Paddle (Merchant of Record, decisão D2)
-no browser e permite ativar/inserir uma chave Pro offline.
+Diálogo de upgrade orientado à venda: banner de modo FREE em destaque,
+pitch de \"nova experiência tecnológica\", grelha de benefícios
+revolucionários, planos selecionáveis, CTA dourado a pulsar e ativação
+offline de chave Pro.
 """
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -16,16 +20,105 @@ from PySide6.QtWidgets import (
 )
 
 from core.licensing import Tier
-from ui.theme import FONT_PRIMARY, MAIN_STYLESHEET
+from i18n import tr
+from ui.theme import MAIN_STYLESHEET, breathe_glow
 
 PADDLE_VENDOR_ID = 0  # TODO: preencher com o vendor_id real do Paddle (D2)
 
+# (id, nome, preço curto, linha extra, destaque)
 _PRODUCTS = [
-    ("Lifetime", "€39,90 (uma vez)", "lifetime"),
-    ("Subscrição", "€4,99/mês · €3,49/mês (anual)", "subscription"),
-    ("Família", "€59,90 · 3 dispositivos", "family"),
-    ("Desconto acessibilidade", "a partir de €19,95 · sob validação", "access"),
+    ("lifetime", "Lifetime", "€39,90", "uma vez · para sempre", True),
+    ("subscription", "Subscrição", "€4,99/mês", "€3,49/mês no plano anual", False),
+    ("family", "Família", "€59,90", "3 dispositivos", False),
+    ("access", "Acessibilidade", "€19,95", "sob validação", False),
 ]
+
+# (chave nome, chave descrição) — só os mais fortes, para não poluir a tela.
+_BENEFITS = [
+    ("benefit.snap", "benefit.snap_short"),
+    ("benefit.voice", "benefit.voice_short"),
+    ("benefit.hands", "benefit.hands_short"),
+    ("benefit.ai", "benefit.ai_short"),
+]
+
+
+class _BenefitRow(QLabel):
+    """Uma linha de benefício: check verde + nome (bold) + mini descrição."""
+
+    def __init__(self, name_key, desc_key, parent=None):
+        super().__init__(parent)
+        self.setObjectName("BenefitRow")
+        self.setText(
+            f'<span style="color:#7DDB8A; font-weight:bold;">✓</span>'
+            f'&nbsp; <b>{tr(name_key)}</b>'
+            f'<span style="color:#8A9AA6;"> — {tr(desc_key)}</span>'
+        )
+        self.setWordWrap(True)
+        self.setToolTip(tr("license.unlocks_title"))
+
+
+class _ProductCard(QFrame):
+    """Cartão de plano selecionável."""
+
+    selected = Signal(str)
+
+    def __init__(self, plan_id, name, price, extra, highlight=False, parent=None):
+        super().__init__(parent)
+        self._plan_id = plan_id
+        self._highlight = highlight
+        self.setObjectName("ProductCard")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMinimumHeight(96)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(14, 12, 14, 12)
+        lay.setSpacing(2)
+
+        top = QHBoxLayout()
+        self._name_lbl = QLabel(name.upper())
+        self._name_lbl.setObjectName("ProductName")
+        top.addWidget(self._name_lbl)
+        if highlight:
+            badge = QLabel("POPULAR")
+            badge.setObjectName("ProductBadge")
+            top.addWidget(badge)
+        else:
+            top.addStretch()
+        lay.addLayout(top)
+
+        self._price_lbl = QLabel(price)
+        self._price_lbl.setObjectName("ProductPrice")
+        lay.addWidget(self._price_lbl)
+
+        self._extra_lbl = QLabel(extra)
+        self._extra_lbl.setObjectName("ProductExtra")
+        lay.addWidget(self._extra_lbl)
+
+        self._selected = False
+        self._refresh_style()
+
+    def set_selected(self, value: bool):
+        self._selected = value
+        self._refresh_style()
+
+    def _refresh_style(self):
+        if self._selected:
+            border = "#FFD766" if self._highlight else "#7DD4FF"
+            bg = "rgba(255,215,102,0.10)" if self._highlight else "rgba(80,200,255,0.08)"
+        else:
+            border = "#1A1A2E"
+            bg = "rgba(255,255,255,0.02)"
+        hover_bg = "rgba(255,255,255,0.06)" if not self._selected else bg
+        self.setStyleSheet(
+            f"QFrame#ProductCard {{ background-color:{bg}; border:2px solid {border}; "
+            f"border-radius:12px; }}"
+            f"QFrame#ProductCard:hover {{ background-color:{hover_bg}; }}"
+        )
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.selected.emit(self._plan_id)
+        super().mousePressEvent(event)
 
 
 class LicenseDialog(QDialog):
@@ -34,83 +127,159 @@ class LicenseDialog(QDialog):
         super().__init__(parent)
         self._cfg = cfg
         self._lm = license_mgr
+        self._selected_plan = "lifetime"
         self.setWindowTitle("Mãouse Pro — Licença")
         self.setObjectName("SettingsDialog")
-        self.setFixedSize(460, 460)
         self.setStyleSheet(MAIN_STYLESHEET)
-        self._build()
-
-    def _build(self):
-        lay = QVBoxLayout(self)
-        lay.setSpacing(14)
-        lay.setContentsMargins(20, 20, 20, 20)
-
-        # Estado atual
-        estado = "✔ PRO ATIVO" if self._lm.is_pro else "MODO FREE"
-        self._status_lbl = QLabel(estado)
-        self._status_lbl.setFont(FONT_PRIMARY)
-        self._status_lbl.setStyleSheet(
-            "color:#50C8FF;" if not self._lm.is_pro else "color:#7DDB8A;"
-        )
-        self._status_lbl.setAlignment(Qt.AlignCenter)
-        lay.addWidget(self._status_lbl)
 
         if self._lm.is_pro:
-            self._build_pro_ui(lay)
+            self.setFixedSize(560, 340)
+            self._build_pro_ui()
         else:
-            self._build_free_ui(lay)
+            self.setFixedWidth(700)
+            self._build_free_ui()
+            self.adjustSize()
 
-    def _build_free_ui(self, lay):
-        txt = QLabel(
-            "Desbloqueia no Pro:\n"
-            "• Snap magnético (cursor \"gruda\" em botões)\n"
-            "• Voz \"Jarvis\" + TTS neural\n"
-            "• Duas mãos (lupa, brilho, gestos)\n"
-            "• IA avançada + auto-afinação\n"
-            "• Luz baixa, arranque automático, personalização"
+    # ── Helpers ───────────────────────────────────────────────────────
+    def _make_card(self, plan):
+        plan_id, name, price, extra, highlight = plan
+        card = _ProductCard(plan_id, name, price, extra, highlight)
+        card.selected.connect(self._on_plan_selected)
+        card.set_selected(plan_id == self._selected_plan)
+        return card
+
+    def _on_plan_selected(self, plan_id):
+        self._selected_plan = plan_id
+        for i in range(self._cards_grid.count()):
+            w = self._cards_grid.itemAt(i).widget()
+            if isinstance(w, _ProductCard):
+                w.set_selected(w._plan_id == plan_id)
+        for plan_id2, name, price, extra, _ in _PRODUCTS:
+            if plan_id2 == plan_id:
+                self._cta.setText(f"⭐  {tr('license.cta')} · {price}")
+                break
+
+    # ── Free / upgrade ────────────────────────────────────────────────
+    def _build_free_ui(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(26, 20, 26, 24)
+        lay.setSpacing(12)
+
+        # Banner de modo FREE — faixa fina, discreta mas sempre visível.
+        banner = QFrame()
+        banner.setObjectName("FreeBanner")
+        b_lay = QHBoxLayout(banner)
+        b_lay.setContentsMargins(14, 8, 14, 8)
+        b_lay.setSpacing(10)
+        b_badge = QLabel("FREE")
+        b_badge.setObjectName("FreeBadge")
+        b_lay.addWidget(b_badge)
+        b_title = QLabel(tr("license.free_badge"))
+        b_title.setObjectName("FreeSub")
+        b_lay.addWidget(b_title)
+        b_lay.addStretch()
+        lay.addWidget(banner)
+        self._banner_pulse = breathe_glow(
+            banner, QColor(255, 138, 60),
+            min_alpha=60, max_alpha=170, min_blur=3, max_blur=18, ms=850,
         )
-        txt.setWordWrap(True)
-        txt.setStyleSheet("color:#F0F4F8;")
-        lay.addWidget(txt)
 
-        for name, price, product in _PRODUCTS:
-            row = QHBoxLayout()
-            lbl = QLabel(f"  {name}  —  {price}")
-            lbl.setStyleSheet("color:#F0F4F8;")
-            btn = QPushButton("Pagar / Checkout")
-            btn.setObjectName("SettingsButton")
-            btn.clicked.connect(lambda _=False, p=product: self._open_checkout(p))
-            row.addWidget(lbl)
-            row.addStretch()
-            row.addWidget(btn)
-            lay.addLayout(row)
+        # Hero com o pitch de nova experiência tecnológica.
+        hero = QHBoxLayout()
+        badge = QLabel("PRO")
+        badge.setObjectName("HeroBadge")
+        hero.addWidget(badge)
+        hero.addSpacing(10)
+        title = QLabel(tr("license.hero"))
+        title.setObjectName("HeroTitle")
+        hero.addWidget(title)
+        hero.addStretch()
+        lay.addLayout(hero)
+        sub = QLabel(tr("license.hero_sub"))
+        sub.setObjectName("HeroSubtitle")
+        sub.setWordWrap(True)
+        lay.addWidget(sub)
 
-        lay.addSpacing(8)
+        # Benefícios — uma coluna limpa com os principais, sem ruído.
+        lay.addSpacing(4)
+        feat_title = QLabel(tr("license.unlocks_title"))
+        feat_title.setObjectName("SectionTitle")
+        feat_title.setAlignment(Qt.AlignLeft)
+        lay.addWidget(feat_title)
+        for nk, dk in _BENEFITS:
+            lay.addWidget(_BenefitRow(nk, dk))
 
+        # Planos.
+        lay.addSpacing(2)
+        self._cards_grid = QGridLayout()
+        self._cards_grid.setSpacing(10)
+        for i, plan in enumerate(_PRODUCTS):
+            self._cards_grid.addWidget(self._make_card(plan), i // 2, i % 2)
+        lay.addLayout(self._cards_grid)
+
+        # CTA principal — a pulsar (destacado).
+        self._cta = QPushButton(f"⭐  {tr('license.cta')} · €39,90")
+        self._cta.setObjectName("ProCta")
+        self._cta.setCursor(Qt.PointingHandCursor)
+        self._cta.setFixedHeight(46)
+        self._cta.clicked.connect(self._on_cta)
+        lay.addWidget(self._cta)
+        self._cta_pulse = breathe_glow(
+            self._cta, QColor(255, 215, 102),
+            min_alpha=70, max_alpha=200, min_blur=6, max_blur=30, ms=850,
+        )
+
+        self._build_key_row(lay)
+
+    def _build_key_row(self, lay):
+        divider = QFrame()
+        divider.setObjectName("MenuDivider")
+        divider.setFixedHeight(1)
+        lay.addSpacing(6)
+        lay.addWidget(divider)
+        key_row = QHBoxLayout()
         self._key_edit = QLineEdit()
-        self._key_edit.setPlaceholderText("Já tem uma chave Pro? Cole-a aqui")
-        self._key_edit.setStyleSheet(
-            "background:#12121E;color:#F0F4F8;border:1px solid #1A1A2E;"
-            "border-radius:6px;padding:8px;font-family:Consolas;"
-        )
-        lay.addWidget(self._key_edit)
-
-        activate = QPushButton("Ativar Chave")
+        self._key_edit.setPlaceholderText(tr("license.has_key"))
+        self._key_edit.setObjectName("KeyEdit")
+        key_row.addWidget(self._key_edit, 1)
+        activate = QPushButton(tr("license.activate_key"))
         activate.setObjectName("SettingsButton")
         activate.clicked.connect(self._activate_key)
-        lay.addWidget(activate)
+        key_row.addWidget(activate)
+        lay.addLayout(key_row)
 
-    def _build_pro_ui(self, lay):
-        txt = QLabel("A sua licença Mãouse Pro está ativa. 💎")
-        txt.setAlignment(Qt.AlignCenter)
-        txt.setStyleSheet("color:#7DDB8A;")
-        lay.addWidget(txt)
+    def _on_cta(self):
+        self._open_checkout(self._selected_plan)
 
-        remover = QPushButton("Remover Licença (voltar a Free)")
+    # ── Pro ativo ─────────────────────────────────────────────────────
+    def _build_pro_ui(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(30, 28, 30, 28)
+        lay.setSpacing(14)
+
+        hero = QHBoxLayout()
+        badge = QLabel("PRO")
+        badge.setObjectName("HeroBadge")
+        hero.addWidget(badge)
+        hero.addSpacing(10)
+        title = QLabel(tr("license.pro_active_title"))
+        title.setObjectName("HeroTitle")
+        hero.addWidget(title)
+        hero.addStretch()
+        lay.addLayout(hero)
+
+        sub = QLabel(tr("license.pro_active_sub"))
+        sub.setObjectName("HeroSubtitle")
+        sub.setWordWrap(True)
+        lay.addWidget(sub)
+
+        lay.addStretch()
+        remover = QPushButton(tr("license.remove"))
         remover.setObjectName("SettingsButton")
         remover.clicked.connect(self._deactivate)
         lay.addWidget(remover)
 
+    # ── Ações ─────────────────────────────────────────────────────────
     def _open_checkout(self, product):
         if not self._lm.open_checkout(product, PADDLE_VENDOR_ID):
             QMessageBox.warning(self, "Checkout",
