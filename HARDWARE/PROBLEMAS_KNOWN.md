@@ -26,17 +26,30 @@
 |---|---|
 | **Sintoma** | FPS ≤15 em CPU de baixo custo sem acelerador de IA |
 | **Dispositivo (confirmado)** | HP Notebook · Intel Core i3-5005U (2.0 GHz) · sem GPU dedicada · 8GB · Win10 Home |
-| **Dados** | 14.6 fps · inferência 48.3 ms · 0 glitches · câmara 640×480@30 (teste real 2026-09-01) |
+| **Dados** | 14.6 fps · inferência 48.3 ms · 0 glitches · câmara 640×480@30 (1ª volta 2026-09-01). Re-teste noite: 11.9 fps / 78.5 ms (variação por luz/carga) |
 | **Impacto matriz** | 🟡 **Aceite** (funciona, mas abaixo dos 25 fps) |
 | **Causa provável** | Inferência MediaPipe em CPU (TFLite XNNPACK sem GPU) + pipeline de frame |
 | **Mitigação** | `--no-gui` (liberta CPU do render); reduzir resolução da câmara; futuro: usar NPU/GPU se disponível |
 | **Ação comercial** | Vender com aviso "requer bom CPU"; **não** ✅ em parcos 100% sem GPU |
-| **Para validar** | Repetir em outro CPU fraco; testar com `--gpu` | ❓ a investigar |
+| **Para validar** | Repetir em outro CPU fraco | ✅ testado `--gpu` → indisponível (ver §1.3) |
 
 ### 1.2. Nenhum dispositivo de GPU dedicada/NPU testado ainda 🔴 A investigar
 
 - Falta medir se **desktop com GPU/NPU dedicada** sobe aos 25+ fps (categoria ✅ para
   marketing/contratos). Prioridade nº1 do LAB (`LAB.md` §4).
+
+### 1.3. Integrada antiga (Intel HD 5500): delegado GPU indisponível 🟠 Limitação
+
+| Campo | Valor |
+|---|---|
+| **Sintoma** | `main.py --gpu` falha ao criar o delegate e cai para CPU (`NotImplementedError`); FPS ≈ CPU (13.4 fps) |
+| **Dispositivo** | HP Notebook · Intel HD Graphics 5500 (iGPU, chip Broadwell 2015) · Win10 Home |
+| **Dados** | `--gpu`: inferência 67.3 ms · 13.4 fps (≈ baseline CPU); aviso "GPU indisponivel; a usar CPU" |
+| **Impacto matriz** | A HD 5500 **não** conta como "GPU dedicada" — continua na categoria CPU fraco |
+| **Causa provável** | MediaPipe Tasks GPU (OpenCL) sem suporte nesta iGPU antiga/drivers |
+| **Mitigação** | Não prometer aceleração em integradas antigas; medir sempre com/sem `--gpu` |
+| **Ação comercial** | Categoria ✅ exige GPU/NPU dedicada real (não iGPU antiga) |
+| **Para validar** | Testar `--gpu` em iGPU nova (Intel 12ª+, AMD Ryzen APU) e GPU dedicada |
 
 ---
 

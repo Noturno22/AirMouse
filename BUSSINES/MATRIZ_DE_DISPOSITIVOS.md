@@ -28,6 +28,7 @@
 | Data | Device / Modelo | Webcam (res/fps) | CPU / GPU | Luz | FPS real | Latência | Cliques fantasma | Gestos (x/12+) | Snap | Veredito | Notas |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-09-01 | HP Notebook · Intel i3-5005U 2.0GHz · 8GB RAM · Win10 Home 64 | 640×480 / 30 | i3-5005U (sem GPU) | boa | **14.6** | inferência 48.3 ms | 0 | (selftest) | off | 🟡 **Aceite** | `main.py --frames 60 --no-preview --no-gui` · 0 glitches · FPS<25 (CPU fraco) — ver `§2` notebook CPU fraco |
+| 2026-09-01 | HP Notebook · i3-5005U · HD 5500 (re-teste noite + `--gpu`) | 640×480 / 30 | i3-5005U + Intel HD 5500 (iGPU antiga) | fraca/noite | **11.9** (13.4 c/`--gpu`) | 78.5 / 67.3 ms | 0 | (selftest) | off | 🟡 **Aceite** | `--gpu` **indisponível** (cai para CPU: `NotImplementedError`) — HD 5500 não expõe OpenCL ao MediaPipe; ver `HARDWARE/PROBLEMAS_KNOWN.md` §1.3 · 0 glitches |
 |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 **Como testar (passo a passo):**
@@ -90,7 +91,8 @@
 | Modo remoto | 0 | 0 | 0 | 0 | ❌ Não |
 
 **Leitura imediata:** o produto **funciona num desktop fraco (i3, sem GPU)** — boa notícia de
-robustez — mas **só a 14.6 fps** nessa classe. Para marketing institucional falta **muito
+robustez — mas **só a 11.9–14.6 fps** nessa classe (varia com luz/carga), e a iGPU antiga
+(HD 5500) **não** acelera via `--gpu`. Para marketing institucional falta **muito
 teste**. Próximos passos de recolha: (1) 1 dispositivo com GPU dedicada/NPU (medir se sobe a
 25+ fps); (2) 5 telemóveis low-end Android; (3) 1 parque real em piloto.
 
