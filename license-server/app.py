@@ -25,6 +25,18 @@ class KeyResponse(BaseModel):
     email: str
 
 
+class ActivateRequest(BaseModel):
+    key: str
+    machine_id: str
+
+
+class ActivateResponse(BaseModel):
+    tier: str
+    lease: str
+    session_id: str
+    use_seq: int
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="AirMouse License Server")
 
@@ -46,6 +58,18 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=403, content={"error": "forbidden"})
         key = issue_key(db, req.email)
         return KeyResponse(key=key, email=req.email)
+
+    from service import activate
+
+    @app.post("/api/v1/activate")
+    def api_activate(req: ActivateRequest, db=Depends(get_db)):
+        try:
+            lease, session_id, use_seq = activate(
+                db, req.key.strip(), req.machine_id.strip())
+        except ValueError as exc:
+            return JSONResponse(status_code=403, content={"error": str(exc)})
+        return ActivateResponse(tier="pro", lease=lease,
+                                session_id=session_id, use_seq=use_seq)
 
     return app
 
