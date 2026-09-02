@@ -149,7 +149,8 @@ class MainWindow(QMainWindow):
     def _load_bg_image(self):
         try:
             root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            path = os.path.join(root, "assets", "brand", "logo.png")
+            name = "logo.png" if self._license and self._license.is_pro else "logo-off.png"
+            path = os.path.join(root, "assets", "brand", name)
             pm = QPixmap(str(path))
             if not pm.isNull():
                 self._bg.setPixmap(pm)
