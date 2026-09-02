@@ -82,8 +82,24 @@ Responsabilidades:
   com uma licença revogada/expirada por longos períodos.
 - **Webhook Paddle:** confirmar pagamento e emitir a chave/licença
   automaticamente (transição de trial → ativado).
-- **Heartbeat:** endpoint (~60 s) que renova o lease, devolve `server_time`
-  assinado e `revocation_nonce`, e atualiza `last_seen` (mantém §4.4 M1/M2).
+- **Heartbeat:** endpoint para renovar o lease, devolver `server_time` assinado e
+  `revocation_nonce`, e atualizar `last_seen` (mantém §4.4 M1/M2).
+
+**Alta disponibilidade do servidor (essencial para zero-graça):**
+Como o cliente já não tolera offline (zero graça), o servidor tem de estar
+**praticamente sempre acessível** — caso contrário pune-se o utilizador legítimo:
+
+- **Multi-região / edge**: implantar o License Server em múltiplas regiões
+  (ex.: Vercel/Fly edge) ou atrás de um CDN/load-balancer global.
+- **Failover automático**: o cliente mantém uma **lista de endpoints** e tenta o
+  seguinte quando o atual falha.
+- **Health checks** contínuos; se um endpoint cai, os pedidos migram
+  automaticamente.
+- **Armazenamento partilhado e consistente** entre regiões (Postgres gerido /
+  banco com replicação global), para o `machine_id`, trial e leases serem os
+  mesmos onde quer que o pedido chegue.
+- **Objectivo de disponibilidade**: ≥99.5% medida em pedidos recebidos, de modo
+  a que a "falta de servidor" seja um evento raro, não um argumento de burla.
 
 Endpoints propostos:
 
@@ -117,8 +133,12 @@ O `LicenseManager` é reescrito para:
 - **Guardar o lease** (JWT/assinatura do servidor) num ficheiro local assinado e
   verificar assinatura + `machine_id` + `exp` + `revocation_nonce` + `use_seq`
   antes de conceder Pro offline (ver desenho robusto §4.4).
-- **Heartbeat periódico** (~60 s) que renova o lease e reporta `last_seen`;
+- **Heartbeat periódico** (~30–60 s) que renova o lease e reporta `last_seen`;
   verifica o `server_time` devolvido contra o relógio local (anti-clock-skew).
+- **Failover de endpoints** (HA): guarda uma lista de endpoints do servidor e
+  tenta o seguinte quando o atual falha; bloqueia só se todos falharem.
+- **Zero-graça offline**: não arranca nem continua sem contactar o servidor —
+  bloqueio imediato se o heartbeat/heartbeat de arranque falhar (ver §4.4 M1).
 - **Bloqueio total** quando trial expira ou lease expira sem renovação: mostra o
   pop-up apelativo de ativação e não permite usar o AirMouse (nem move/click).
 
@@ -157,8 +177,8 @@ era fraco por três motivos — um utilizador determinado podia:
 
 O lease **melhorado** resolve isto combinando três mecanismos:
 
-#### M1 — Heartbeat + relógio verificado
-- O cliente envia heartbeat ao servidor em intervalos curtos (ex.: **60 s**).
+#### M1 — Heartbeat + relógio verificado (estrito, zero-graça)
+- O cliente envia heartbeat ao servidor em intervalos curtos (ex.: **30–60 s**).
 - O servidor responde com um **`server_time` assinado**. O cliente compara o
   relógio local com o `server_time`: se o relógio local divergir muito (clock
   skew > tolerância, ex.: ±10 min), o lease é **invalidado** e exige reativação.
@@ -166,6 +186,14 @@ O lease **melhorado** resolve isto combinando três mecanismos:
   cliente prova atividade regular via heartbeat. Estar "offline com relógio
   congelado" deixa de funcionar porque o servidor marca o `last_seen` e anula o
   lease quando o cliente deixa de aparecer.
+- **Zero-graça offline:** o cliente **não tolera offline**. Se o heartbeat
+  falhar (ou se não haver servidor atingível no arranque), o AirMouse **bloqueia
+  imediatamente** — sem período de graça. Em vez de o cliente "aguentar" quedas
+  de rede (o que dava a janela de 2–3 min ao reincidente), a disponibilidade é
+  garantida pelo **servidor de alta disponibilidade** (multi-região + failover,
+  §4.1). O utilizador legítimo com falha de rede momentânea é raro e remediado
+  pela HA do servidor; o reincidente que bloqueia o servidor ganha **0 segundos**
+  porque o cliente pára sem servidor.
 
 #### M2 — Nonce de revogação server-side (stateless revocation)
 - O servidor mantém um **número de revogação global** (`revocation_nonce`) que
@@ -206,16 +234,20 @@ O lease **melhorado** resolve isto combinando três mecanismos:
 #### Regras de decisão no cliente (são: gate de bloqueio)
 - Lease válido (assinatura + `machine_id` + `exp` + nonce + seq OK) **e**
   servidor atingível → **Pro liberto**.
-- Lease válido mas heartbeat falhou (offline) → tolerância curta de graça
-  (ex.: graça de 2–3 heartbeats ≈ 2–3 min) e depois **bloqueio**.
+- Qualquer falha de contacto com o servidor (arranque ou heartbeat) →
+  **bloqueio imediato, zero graça**. O cliente tenta os endpoints de failover
+  (HA) e, se nenhum responder, pára.
 - Lease expirado / nonce obsoleto / relógio divergente / seq repetido →
   **bloqueio total** + pedido de reativação/heartbeat.
 
 **Resultado:** com `server_time` verificado, `revocation_nonce`, `session_id` +
-`use_seq` antireplay e heartbeat curto, nenhum dos três ataques (relógio
-congelado, snapshot, falta de revogação) sobrevive. O pior caso para um
-reincidente é usar Pro offline durante a **graça de 2–3 min** após perder a
-conexão — e só se conseguir manter o servidor inalcançável.
+`use_seq` antireplay, **zero graça offline** e servidor de alta disponibilidade,
+nenhum dos ataques (relógio congelado, snapshot, falta de revogação, isolar o
+servidor) sobrevive. O pior cenário para um reincidente é **0 segundos** de uso
+Pro não pago: sem contacto com o servidor, o cliente bloqueia logo. A
+compensação para o utilizador legítimo é a **disponibilidade ≥99.5%** do servidor
+e o **failover** entre endpoints, garantindo que a ausência de servidor é um
+evento raro — não um benefício para burla.
 
 ## 5. Fluxo de utilizador (happy path)
 
@@ -227,18 +259,20 @@ conexão — e só se conseguir manter o servidor inalcançável.
 4. User compra via Paddle → webhook ativa a licença no servidor.
 5. User recebe a chave → cola no AirMouse → `activate` liga `key↔machine_id`.
 6. Cliente guarda o lease e usa Pro (lease de 30 min, ver §4.4).
-7. O **heartbeat (~60 s)** renova o lease e mantém-no vivo enquanto a conexão
-   existe. Se o servidor for inalcançável, há uma **graça de 2–3 min** de uso
-   offline; passada essa graça → bloqueio (aviso contínuo).
+7. O **heartbeat (~30–60 s)** renova o lease e mantém o Pro vivo enquanto há
+   contacto com o servidor. Se o servidor se tornar inalcançável (todos os
+   endpoints de failover falharem), há **bloqueio imediato, zero graça** (com
+   aviso a pedir ligação) — ver §4.4 M1.
 8. Tentativa de usar a **mesma chave noutra máquina** → servidor rejeita
    (`machine_id` não corresponde ao vinculado). Aparece erro claro.
 
 ## 6. Tratamento de erros e casos edge
 
-- **Offline no arranque sem lease válido** → bloqueio (com mensagem a pedir
-  ligação). Não concede Pro se não for possível provar.
-- **Offline com lease válido** → funciona durante a **graça de 2–3 min**; depois
-  bloqueio (heartbeat, §4.4 M1).
+- **Offline no arranque, sem servidor atingível (nem failover)** → **bloqueio
+  imediato** (mensagem a pedir ligação). Não concede uso se não for possível
+  provar a licença.
+- **Perda de conexão durante uso** → o heartbeat falha; após tentar todos os
+  endpoints de failover sem resposta → **bloqueio imediato, zero graça** (§4.4 M1).
 - **Clock do utilizador adiantado/atrasado** → `exp` verificado com `nbf`/margem
   E comparado com o `server_time` assinado do servidor (§4.4 M1).
 - **Snapshot antigo do lease restaurado** → `session_id`/`use_seq` repetido →
@@ -263,8 +297,9 @@ conexão — e só se conseguir manter o servidor inalcançável.
 - **Lease com `use_seq` repetido (replay/snapshot) → bloqueio** (M3).
 - **Relógio local divergente do `server_time` (clock skew) → bloqueio/reativação**
   (M1).
-- **Heartbeat falha repetidamente (offline além da graça de 2–3 min) → bloqueio**
-  (M1).
+- **Qualquer falha de heartbeat (arranque ou durante uso, todos os endpoints de
+  failover esgotados) → bloqueio imediato, zero graça** (M1).
+- **Failover: endpoint primário cai → cliente tenta os seguintes com sucesso** (HA).
 - Offline sem lease → bloqueio com mensagem.
 - `--dev-pro` ausente/neutro → sem bypass.
 
@@ -277,6 +312,8 @@ conexão — e só se conseguir manter o servidor inalcançável.
 - **`revocation_nonce` incrementa em revogação e anula leases antigos** (M2).
 - **`session_id`/`use_seq` repetidos são detetados e rejeitados** (M3).
 - **`server_time` assinado é devolvido; heartbeat atualiza `last_seen`** (M1).
+- **Estado partilhado/consistente entre regiões (machine_id, trial, leases)** (HA).
+- **Health check e migração de pedidos quando uma região cai** (HA).
 
 ### Segurança / penetração (manual, checklist)
 - Copiar `license.json`+binário para outro PC → bloqueado (fingerprint diff).
@@ -284,8 +321,10 @@ conexão — e só se conseguir manter o servidor inalcançável.
 - **Congelar o relógio do PC → clock-skew deteta e bloqueia** (M1).
 - **Guardar/restaurar um snapshot antigo do lease → `use_seq` replay rejeitado**
   (M3).
-- **Banir/bloquear o servidor via firewall durante muito tempo → graça de
-  2–3 min e depois bloqueio** (M1).
+- **Banir/bloquear TODOS os endpoints do servidor via firewall num PC clonado →
+  cliente bloqueia em 0s** (M1 + HA).
+- **Derrubar uma região → failover migra para outra, licença continua a validar**
+  (HA).
 - Brute-force de chave → rate-limit / logout.
 - Reverter relógio → não estende trial/lease.
 
@@ -310,11 +349,13 @@ conexão — e só se conseguir manter o servidor inalcançável.
 - Stack do servidor: **FastAPI (Python)** recomendado por coerência com o projeto.
 - Duração do lease offline: **30 minutos** (curto — limita a janela offline e
   obriga a revalidação frequente com o servidor).
-- **Heartbeat:** intervalos de **~60 s**; **graça offline de 2–3 min** após a
-  última resposta do servidor (ver §4.4 M1).
+- **Heartbeat:** intervalos de **~30–60 s**; **zero graça offline** (bloqueio
+  imediato sem contacto com o servidor, ver §4.4 M1).
+- **Alta disponibilidade:** multi-região/edge + failover entre endpoints;
+  objetivo de disponibilidade ≥99.5% (§4.1).
 - **Clock-skew tolerância:** ±10 min entre relógio local e `server_time` (M1).
-- Storage: **SQLite** suficiente para 1 pessoa/start; migrar para Postgres se
-  escalar.
+- Storage: **SQLite** suficiente para 1 pessoa/start; migrar para Postgres
+  replicado entre regiões se escalar (para a HA).
 - Formato do lease: **JWT HS256** assinado com secret do servidor.
 
 ---
