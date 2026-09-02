@@ -31,3 +31,5 @@ Desktop.ini
 
 # Secrets
 .env
+# Gerado pelo build
+version_info.txt

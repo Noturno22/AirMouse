@@ -34,8 +34,9 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
-    icon=None,
+    console=False,
+    icon="assets/brand/maouse.ico",
+    version="version_info.txt",
 )
 
 coll = COLLECT(

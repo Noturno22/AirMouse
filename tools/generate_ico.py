@@ -1,49 +1,43 @@
-"""
-Gera o icone .ico do desktop a partir do SVG do simbolo.
-Requer: pip install cairosvg Pillow
+"""Gera o ícone .ico da app a partir do logo.png (raster) com Pillow.
+
+Sem dependência de cairo (que não está disponível no Windows), ao contrário da
+versão anterior que usa cairosvg/rlPyCairo.
+
 Uso: python tools/generate_ico.py
 """
 import sys
 from pathlib import Path
 
-try:
-    import io
-
-    import cairosvg
-    from PIL import Image
-except ImportError:
-    print("Instale as dependencias: pip install cairosvg Pillow")
-    sys.exit(1)
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-SVG_SRC = ROOT / "assets" / "brand" / "logo-symbol.svg"
+SRC = ROOT / "assets" / "brand" / "logo.png"
 ICO_OUT = ROOT / "assets" / "brand" / "maouse.ico"
 
-SIZES = [16, 32, 48, 64, 128, 256]
+SIZES = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 
 
 def main():
-    if not SVG_SRC.exists():
-        print(f"SVG nao encontrado: {SVG_SRC}")
+    if not SRC.exists():
+        print(f"Logo nao encontrado: {SRC}")
         sys.exit(1)
 
-    svg_data = SVG_SRC.read_bytes()
-    images = []
+    im = Image.open(SRC).convert("RGBA")
 
-    for size in SIZES:
-        png_data = cairosvg.svg2png(
-            bytestring=svg_data,
-            output_width=size,
-            output_height=size,
-        )
-        img = Image.open(io.BytesIO(png_data))
-        images.append(img)
+    # Recorta o conteudo para um quadrado centrado (o logo ja e quadrado).
+    width, height = im.size
+    side = min(width, height)
+    left = (width - side) // 2
+    top = (height - side) // 2
+    im = im.crop((left, top, left + side, top + side))
 
-    images[0].save(
+    icon = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    icon.paste(im.resize((256, 256), Image.LANCZOS), (0, 0))
+
+    icon.save(
         ICO_OUT,
         format="ICO",
-        sizes=[(s, s) for s in SIZES],
-        append_images=images[1:],
+        sizes=SIZES,
     )
     print(f"Icone gerado: {ICO_OUT}")
 
