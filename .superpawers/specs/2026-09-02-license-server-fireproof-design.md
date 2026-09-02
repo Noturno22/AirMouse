@@ -76,7 +76,10 @@ Responsabilidades:
   é a fonte de verdade do trial, para que apagar o ficheiro local não reinicie
   os 30 min.
 - **Leases:** emitir um **lease assinado (JWT assinado com secret do servidor)**,
-  com `exp` de duração configurável (ex.: 7 dias), que o cliente usa offline.
+  com `exp` de **30 minutos**, que o cliente usa offline. O lease curto limita a
+  janela offline: o cliente tem de revalidar com o servidor a cada 30 min, o que
+  torna impossível continuar a usar o Pro com uma licença revogada/expirada por
+  longos períodos.
 - **Webhook Paddle:** confirmar pagamento e emitir a chave/licença
   automaticamente (transição de trial → ativado).
 - **Heartbeat:** endpoint para renovar/estender o lease e reportar keep-alive.
@@ -146,9 +149,9 @@ porque o `machine_id` não bate com o registado no servidor.
    botões para os planos (Lifetime €39,90 / Sub €4,99 / Família / Access).
 4. User compra via Paddle → webhook ativa a licença no servidor.
 5. User recebe a chave → cola no AirMouse → `activate` liga `key↔machine_id`.
-6. Cliente guarda lease e usa Pro **offline** até expirar (ex.: 7 dias).
-7. De tempos a tempos, heartbeat renova o lease. Sem renovação → degrada para
-   trial/bloqueio, com aviso.
+6. Cliente guarda lease e usa Pro **offline** até expirar (**30 min**).
+7. O heartbeat renova o lease a intervalos (< 30 min). Sem renovação → o lease
+   expira e degrada para bloqueio, com aviso.
 8. Tentativa de usar a **mesma chave noutra máquina** → servidor rejeita
    (`machine_id` não corresponde ao vinculado). Aparece erro claro.
 
@@ -210,7 +213,8 @@ porque o `machine_id` não bate com o registado no servidor.
 ## 10. Decisões a fechar durante implementação
 
 - Stack do servidor: **FastAPI (Python)** recomendado por coerência com o projeto.
-- Duração do lease offline: default **7 dias** (configurável no servidor).
+- Duração do lease offline: **30 minutos** (curto — limita a janela offline e
+  obriga a revalidação frequente com o servidor).
 - Storage: **SQLite** suficiente para 1 pessoa/start; migrar para Postgres se
   escalar.
 - Formato do lease: **JWT HS256** assinado com secret do servidor.
@@ -218,5 +222,5 @@ porque o `machine_id` não bate com o registado no servidor.
 ---
 
 *Este design segue a Abordagem B (híbrida) aprovada: validação online na
-ativação/renovação, lease offline de longa duração, com a regra dura
+ativação/renovação, lease offline de 30 minutos, com a regra dura
 1 chave = 1 utilizador = 1 máquina e trial Free de 30 min com bloqueio total.*
