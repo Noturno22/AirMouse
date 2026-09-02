@@ -16,7 +16,7 @@ CLASSES = (
     Gesture.ROCK,
     Gesture.SHAKA,
 )
-FEATURES = 60
+FEATURES = 120
 N_CLASSES = len(CLASSES)
 
 MODEL_URLS = (
@@ -47,6 +47,28 @@ def _normalize(points):
     return np.concatenate([x / scale, y / scale, z_rel])
 
 
+def _is_frame_list(p):
+    try:
+        first = p[0]
+    except (IndexError, TypeError, KeyError):
+        return False
+    arr = np.asarray(first)
+    return arr.ndim == 2
+
+
+def _aggregate(frames):
+    feats = []
+    for f in frames:
+        feat = _normalize(f)
+        if feat is not None:
+            feats.append(feat)
+    if not feats:
+        return None
+    cur = feats[-1]
+    mean = np.mean(np.stack(feats), axis=0)
+    return np.concatenate([cur, mean])
+
+
 class GestureAI:
     def __init__(self, path):
         if not os.path.isfile(path):
@@ -63,11 +85,12 @@ class GestureAI:
         if self.w1.shape[0] != FEATURES:
             raise FileNotFoundError(
                 f"modelo obsoleto em {path} ({self.w1.shape[0]} features; "
-                f"esperado {FEATURES} 3D). Retreina: tools\\train_gesture_ai.py"
+                f"esperado {FEATURES} temporal). Retreina: tools\\train_gesture_ai.py"
             )
 
     def classify(self, points_px):
-        feat = _normalize(points_px)
+        frames = list(points_px) if _is_frame_list(points_px) else [points_px]
+        feat = _aggregate(frames)
         if feat is None:
             return None, 0.0
         h1 = np.tanh(feat @ self.w1 + self.b1)

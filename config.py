@@ -108,6 +108,7 @@ class Config:
 
     ai_enabled: bool = True
     ai_confidence_min: float = 0.72
+    ai_window: int = 5
     ai_model_path: str = "models/gesture_mlp.npz"
 
     voice_enabled: bool = True

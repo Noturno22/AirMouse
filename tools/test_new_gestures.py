@@ -24,7 +24,13 @@ def check(name, cond, extra=""):
 
 
 def to_lm(skel_px):
-    return ((skel_px + [ORIGIN[0], ORIGIN[1]]) / [W, H]).tolist()
+    s = np.asarray(skel_px, dtype=float)
+    x = (s[:, 0] + ORIGIN[0]) / W
+    y = (s[:, 1] + ORIGIN[1]) / H
+    if s.shape[1] > 2:
+        z = s[:, 2]
+        return [(x[i], y[i], z[i]) for i in range(len(x))]
+    return [(x[i], y[i]) for i in range(len(x))]
 
 
 def feed(engine, skel, frames, dy_per_frame=0.0):
@@ -38,7 +44,8 @@ def feed(engine, skel, frames, dy_per_frame=0.0):
             events.append((ev, val))
         last = engine._committed
         if dy_per_frame:
-            cur = cur + np.array([0.0, dy_per_frame])
+            d = np.array([0.0, dy_per_frame] + ([0.0] if cur.shape[1] > 2 else []))
+            cur = cur + d
     return events, last
 
 
@@ -221,7 +228,7 @@ def fist_with_thumb_curled():
     skel = synthesize(Gesture.FIST, np.random.default_rng(7)) * PX_SCALE
     lm = to_lm(skel)
     # aproxima o polegar da regiao do medio, como quando se fecha o punho
-    lm[4] = [lm[9][0], lm[9][1]]
+    lm[4] = [lm[9][0], lm[9][1], lm[9][2]]
     return lm
 
 

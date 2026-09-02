@@ -75,7 +75,7 @@ try:
     out_dir = os.path.join(tmp, "models")
     os.makedirs(out_dir, exist_ok=True)
     dummy = os.path.join(out_dir, "gesture_mlp.npz")
-    np.savez_compressed(dummy, w1=np.zeros((60, 96)), b1=np.zeros(96),
+    np.savez_compressed(dummy, w1=np.zeros((120, 96)), b1=np.zeros(96),
                         w2=np.zeros((96, 48)), b2=np.zeros(48),
                         w3=np.zeros((48, N_CLASSES)), b3=np.zeros(N_CLASSES))
     train(per_class=300, epochs=2, real_path=fake, out_dir=out_dir, real_copies=2)

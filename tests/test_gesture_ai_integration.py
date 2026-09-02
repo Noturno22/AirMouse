@@ -40,7 +40,7 @@ class _StubAI:
         return self.gesture, self.conf
 
 
-def test_ai_receives_3d_points():
+def test_ai_receives_window_of_3d_points():
     captured = []
     class SpyAI:
         def classify(self, pts):
@@ -50,8 +50,44 @@ def test_ai_receives_3d_points():
     skel = synthesize(Gesture.OPEN, np.random.default_rng(3)).astype(float)
     pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
     lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
-    eng.update(lm, 640, 480)
+    for _ in range(3):
+        eng.update(lm, 640, 480)
     assert captured
-    c = np.asarray(captured[0])
-    assert c.ndim == 2
-    assert c.shape[1] == 3
+    c = np.asarray(captured[-1], dtype=float)
+    # janela recebida pelo classify: lista de frames (W, 21, 3)
+    assert c.ndim == 3
+    assert c.shape[1] == 21 and c.shape[2] == 3
+
+
+def test_ai_window_capped_by_config():
+    cfg = Config()
+    cfg.ai_window = 2
+    captured = []
+    class SpyAI:
+        def classify(self, pts):
+            captured.append(pts)
+            return Gesture.OPEN, 0.0
+    eng = GestureEngine(cfg, gesture_ai=SpyAI())
+    skel = synthesize(Gesture.OPEN, np.random.default_rng(4)).astype(float)
+    pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
+    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
+    for _ in range(7):
+        eng.update(lm, 640, 480)
+    c = np.asarray(captured[-1], dtype=float)
+    assert c.shape[0] == 2  # limitado por ai_window=2
+
+
+def test_reset_clears_ai_window():
+    cfg = Config()
+    called = []
+    class SpyAI:
+        def classify(self, pts):
+            called.append(pts)
+            return Gesture.OPEN, 0.0
+    eng = GestureEngine(cfg, gesture_ai=SpyAI())
+    skel = synthesize(Gesture.OPEN, np.random.default_rng(5)).astype(float)
+    pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
+    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
+    eng.update(lm, 640, 480)
+    eng.reset()
+    assert len(eng._ai_window) == 0

@@ -1,3 +1,4 @@
+import collections
 import math
 from dataclasses import dataclass
 from enum import Enum
@@ -48,6 +49,7 @@ class GestureEngine:
         self.cfg = cfg
         self.ai = gesture_ai
         self.ai_conf = 0.0
+        self._ai_window = collections.deque(maxlen=getattr(cfg, "ai_window", 5))
         self._pinch_index_on = False
         self._pinch_mid_on = False
         self._candidate = Gesture.NONE
@@ -60,6 +62,7 @@ class GestureEngine:
         self._prev_curled = [False, False, False, False]
 
     def reset(self):
+        self._ai_window.clear()
         self._pinch_index_on = False
         self._pinch_mid_on = False
         self._candidate = Gesture.NONE
@@ -78,6 +81,7 @@ class GestureEngine:
             pts3 = [(lm[0] * width, lm[1] * height, lm[2]) for lm in landmarks]
         else:
             pts3 = pts
+        self._ai_window.append(pts3)
         wrist = pts[0]
         scale = max(_dist(wrist, pts[9]), 1e-6)
         # racio 2D: fiável de frente para a câmara (os dedos sobrepõem-se na projeção)
@@ -250,8 +254,8 @@ class GestureEngine:
 
         raw = geo
         self.ai_conf = 0.0
-        if self.ai is not None and not too_far:
-            ml_g, conf = self.ai.classify(pts3)
+        if self.ai is not None and not too_far and self._ai_window:
+            ml_g, conf = self.ai.classify(list(self._ai_window))
             self.ai_conf = conf
             if ml_g is not None and conf >= cfg.ai_confidence_min:
                 # a IA so pode confirmar o que a geometria tambem ve;

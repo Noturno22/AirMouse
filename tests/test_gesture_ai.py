@@ -78,7 +78,7 @@ class TestConstants:
         assert len(CLASSES) == N_CLASSES
 
     def test_features(self):
-        assert FEATURES == 60
+        assert FEATURES == 120
 
     def test_rock_in_classes(self):
         names = [c.name for c in CLASSES]
@@ -145,3 +145,27 @@ class TestGestureAI:
         pred, conf = ai.classify(degenerate)
         assert pred is None
         assert conf == 0.0
+
+    def test_classify_window_of_frames(self, tmp_models):
+        ai = GestureAI(tmp_models[1])
+        local = np.random.default_rng(11)
+        base = _skeleton_3d(5)
+        frames = [base + local.uniform(0, 0.02, base.shape) for _ in range(5)]
+        frames.append(_skeleton_3d(6))
+        pred, conf = ai.classify(frames)
+        assert pred in CLASSES
+        assert 0.0 <= conf <= 1.0
+
+    def test_classify_empty_window_none(self, tmp_models):
+        ai = GestureAI(tmp_models[1])
+        # todos os frames degenerados -> nenhum normalizavel
+        bad = np.zeros((21, 3))
+        pred, conf = ai.classify([bad, bad])
+        assert pred is None
+        assert conf == 0.0
+
+    def test_classify_single_numpy_frame_not_list(self, tmp_models):
+        # numpy (21,3) tratado como frame unico (nao como lista de frames)
+        ai = GestureAI(tmp_models[1])
+        pred, conf = ai.classify(_skeleton_3d(9))
+        assert pred in CLASSES

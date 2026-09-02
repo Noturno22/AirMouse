@@ -226,6 +226,16 @@ def _to_feature(pts):
     return feat.astype(np.float32)
 
 
+WINDOW = 5
+
+
+def _window_from_features(feats):
+    feats = np.stack([np.asarray(f, dtype=np.float64) for f in feats])
+    cur = feats[-1]
+    mean = feats.mean(axis=0)
+    return np.concatenate([cur, mean]).astype(np.float32)
+
+
 def jitter_real(pts, rng):
     scale = float(np.hypot(pts[9, 0] - pts[0, 0], pts[9, 1] - pts[0, 1]))
     if scale < 1e-6:
@@ -276,11 +286,16 @@ def make_dataset(per_class, rng):
     for g in CLASSES:
         made = 0
         while made < per_class:
-            raw = synthesize(g, rng)
-            f = augment(raw, rng)
-            if f is None:
+            feats = []
+            for _ in range(WINDOW):
+                raw = synthesize(g, rng)
+                f = augment(raw, rng)
+                if f is None:
+                    break
+                feats.append(f)
+            if len(feats) < WINDOW:
                 continue
-            xs.append(f)
+            xs.append(_window_from_features(feats))
             ys.append(CLASS_IDS[g])
             made += 1
     X = np.stack(xs)
@@ -322,13 +337,14 @@ def evaluate_runtime(net_params, trials=4000, seed=4242):
     low_conf_wrong = 0
     for _ in range(trials):
         g = CLASSES[int(vrng.integers(0, N_CLASSES))]
-        raw = synthesize(g, vrng)
-        f = augment(raw, vrng)
-        if f is None:
-            continue
-        px = np.zeros((21, 3))
-        px[1:] = np.column_stack([f[:20], f[20:40], f[40:]])
-        pg, pc = ai.classify(px)
+        frames = []
+        for _ in range(WINDOW):
+            raw = synthesize(g, vrng)
+            px = np.empty_like(raw)
+            px[:, :2] = raw[:, :2] * 150 + 320.0
+            px[:, 2] = raw[:, 2]
+            frames.append(px)
+        pg, pc = ai.classify(frames)
         tested += 1
         if pg == g:
             correct += 1
@@ -362,22 +378,25 @@ def train(per_class=6000, epochs=24, real_path=None, out_dir=None, real_copies=4
         for i in range(len(pts_tr)):
             f = _to_feature(pts_tr[i])
             if f is not None:
-                feats.append(f)
+                feats.append(_window_from_features([f]))
                 labels.append(int(Yr[idx_tr[i]]))
             for _ in range(real_copies):
                 j = jitter_real(pts_tr[i], rng_real)
                 fj = _to_feature(j) if j is not None else None
                 if fj is not None:
-                    feats.append(fj)
+                    feats.append(_window_from_features([fj]))
                     labels.append(int(Yr[idx_tr[i]]))
         Xtr = np.vstack([Xtr, np.stack(feats)])
         Ytr = np.concatenate([Ytr, np.array(labels, dtype=np.int64)])
         perm = rng_real.permutation(len(Xtr))
         Xtr, Ytr = Xtr[perm], Ytr[perm]
-        clean = [_to_feature(p) for p in Xr[idx_va]]
-        keep = [k for k, f in enumerate(clean) if f is not None]
-        real_va_X = np.stack([clean[k] for k in keep])
-        real_va_y = Yr[idx_va][keep]
+        clean = []
+        for p in Xr[idx_va]:
+            f = _to_feature(p)
+            if f is not None:
+                clean.append(_window_from_features([f]))
+        real_va_X = np.stack(clean) if clean else np.zeros((0, FEATURES))
+        real_va_y = Yr[idx_va][: len(clean)]
         order = rng_real.permutation(len(real_va_X))
         real_va_X, real_va_y = real_va_X[order], real_va_y[order]
         print(f"mistura: +{len(feats)} amostras reais (com {real_copies} variantes)")
