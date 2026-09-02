@@ -176,4 +176,4 @@ airmouse/
 ```
 
 MAO-PROA9-D6BE9-549FC-AEE5C-C78C4-E4622-4BF56
- opencode -s ses_fa0eb4251ffeEBahDTjT2jqNia
+opencode -s ses_fa0eb4251ffeEBahDTjT2jqNia

@@ -4,7 +4,7 @@
 > **Nome técnico/repositório:** AirMouse
 > **Autor:** Luar Studio Angola · 2026
 > **Plataformas:** Desktop (Windows) + Mobile (Android/iOS)
-> **Lema:** *"A mão é o novo mouse. Sem cauda. Sem fio. Sem limites."*
+> **Lema:** *"Sem cauda. Sem fios. Sem limites."*
 
 ---
 
