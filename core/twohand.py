@@ -502,15 +502,20 @@ class LeftHandDetector:
         self._scroll_acc = 0.0
         self._swipe_until = 0.0
         # PEACE ("paz") com a mao esquerda mostra/oculta a interface (GUI).
-        # _peace_on guarda o estado do gesto da frame anterior (rising edge) e
+        # _peace_on guarda o estado do gesto da frame anterior (rising edge),
+        # _peace_streak conta frames consecutivos de PEACE (anti-flicker) e
         # _toggle_until e o cooldown contra disparos repetidos ao manter o gesto.
         self._peace_on = False
+        self._peace_streak = 0
         self._toggle_until = 0.0
         # "Pick mode" (escolher janela): mao esquerda aberta e mantida durante
         # alguns segundos abre o alternador de janelas. Enquanto o pick mode
         # estiver ativo, os swipes navegam sem soltar o Alt.
         self._open_since = None
         self._switcher_open = False
+        # Grace de perda: se a mao esquerda sumir so por 1-2 frames, nao
+        # reiniciamos o estado (evita reinicios que anulam hold/PEACE/swipe).
+        self._lost_since = None
 
     def update(self, palm, now, gesture=None):
         """palm: (x, y) em px, ou None se a mao esquerda nao estiver visivel.
@@ -518,8 +523,12 @@ class LeftHandDetector:
         paz (PEACE) que mostra/oculta a interface."""
         cfg = self.cfg
         if palm is None:
-            self.reset()
+            if self._lost_since is None:
+                self._lost_since = now
+            if now - self._lost_since >= cfg.left_hand_lost_grace_s:
+                self.reset()
             return None, None
+        self._lost_since = None
         px, py = palm
         self._samples.append((px, py, now))
         while self._samples and now - self._samples[0][2] > cfg.left_hand_swipe_window_s:
@@ -529,20 +538,26 @@ class LeftHandDetector:
         val = None
 
         # PEACE ("paz") com a mao esquerda -> mostrar/ocultar a interface (GUI).
-        # Dispara na transicao para PEACE (rising edge) e tem cooldown para nao
-        # repetir enquanto a mao ficar parada no gesto.
+        # Dispara no rising edge apos N frames consecutivos de PEACE (anti
+        # flicker) e tem cooldown para nao repetir enquanto a mao ficar parada.
         if gesture is not None:
             if gesture == Gesture.PEACE:
-                if not self._peace_on and now >= self._toggle_until:
+                self._peace_streak += 1
+                if (
+                    not self._peace_on
+                    and self._peace_streak >= cfg.left_hand_gesture_stable_frames
+                    and now >= self._toggle_until
+                ):
                     self._toggle_until = now + cfg.left_hand_cooldown_s
                     ev = "gui_toggle"
                     val = None
+                    self._peace_on = True
                     self._samples.clear()
                     self._scroll_acc = 0.0
                     self._scroll_prev_y = None
-                self._peace_on = True
             else:
                 self._peace_on = False
+                self._peace_streak = 0
 
         # Pick mode: segurar a mao ABERTA durante N segundos abre o alternador.
         # Apos disparar, mantem-se ativo enquanto a mao continuar aberta; os
@@ -561,12 +576,23 @@ class LeftHandDetector:
 
         # SWIPE horizontal + Scroll continuo (Pro-locked: no Free ficam desligados).
         if self.allow_commands:
-            # SWIPE horizontal: deslocamento X dominante e rapido dentro da janela
+            # SWIPE horizontal: deslocamento X dominante, rapido e PROPOSITADO
+            # dentro da janela. Exige dominancia horizontal (dom) E velocidade
+            # minima para nao disparar por deriva lenta ou movimento diagonal.
             if now >= self._swipe_until and len(self._samples) >= 3:
                 x0 = self._samples[0][0]
+                y0 = self._samples[0][1]
+                t0 = self._samples[0][2]
                 dx = px - x0
-                dy = py - self._samples[0][1]
-                if abs(dx) >= cfg.left_hand_swipe_min_px and abs(dx) > abs(dy) * 1.5:
+                dy = py - y0
+                dom = cfg.left_hand_swipe_dom or 1.5
+                dt = max(now - t0, 1e-3)
+                speed = abs(dx) / dt
+                if (
+                    abs(dx) >= cfg.left_hand_swipe_min_px
+                    and abs(dx) > abs(dy) * dom
+                    and speed >= cfg.left_hand_swipe_min_speed_px_s
+                ):
                     ev = "alt_tab_forward" if dx > 0 else "alt_tab_back"
                     val = None
                     self._swipe_until = now + cfg.left_hand_cooldown_s

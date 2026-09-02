@@ -243,9 +243,9 @@ def main():
     cfg.ai_enabled = cfg.ai_enabled and ent["ai"]
     cfg.autotune_enabled = cfg.autotune_enabled and ent["autotune"]
     cfg.low_light_boost = cfg.low_light_boost and ent["low_light"]
-    cfg.magnifier_enabled = cfg.magnifier_enabled and ent["two_hands"]
-    cfg.clap_enabled = cfg.clap_enabled and ent["two_hands"]
-    cfg.left_hand_commands = cfg.left_hand_commands and ent["two_hands"]
+    cfg.magnifier_enabled = cfg.magnifier_enabled
+    cfg.clap_enabled = cfg.clap_enabled
+    cfg.left_hand_commands = cfg.left_hand_commands
     # Deteta SEMPRE ate 2 maos (para a UI poder mostrar "2 maos" tambem no
     # Free); o que fica bloqueado sao os RECURSOS de 2 maos, nao a deteccao.
     cfg.num_hands = 2

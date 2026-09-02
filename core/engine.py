@@ -45,10 +45,16 @@ def _command_hand_frame(results, mirror: bool, frame_w: int):
     pela POSICAO X no ecra (fiável), em vez do label MediaPipe (instável nesta
     câmara — chega a marcar as duas como 'Right' e a oscilar).
 
-    Com o espelho ativo + tracking no frame espelhado, a mão esquerda física
-    fica na METADE ESQUERDA do ecra (x < frame_w/2). Requerir X na metade
-    esquerda evita que a mão direita do cursor (sozinha) seja tratada como
-    mão de comandos.
+    O frame que alimenta o tracker já vem ESPELHADO quando cfg.mirror=True
+    (engine faz cv2.flip antes). Logo o lado do ecra onde fica a mão esquerda
+    física depende do espelho:
+      * mirror=True  -> tracking no frame espelhado; a mão esquerda fica na
+        METADE ESQUERDA (x < frame_w/2);
+      * mirror=False -> tracking sem espelho (x não invertido); a mão esquerda
+        fica na METADE DIREITA (x >= frame_w/2).
+
+    Requerer X no lado correto evita que a mão direita do cursor (sozinha,
+    no lado oposto) seja tratada como mão de comandos.
     """
     if not results:
         return None
@@ -61,13 +67,18 @@ def _command_hand_frame(results, mirror: bool, frame_w: int):
         candidates.append((palm[0], hf, event, ev_value))
     if not candidates:
         return None
-    # Só uma mão na METADE ESQUERDA é a de comandos. Se não há nenhuma mão à
-    # esquerda, não há mão de comandos (a mão direita sozinha é só o cursor),
-    # para a mão direita não abrir o alternador/scroll enquanto se move.
-    left = [c for c in candidates if c[0] < half]
-    if not left:
-        return None
-    best = min(left, key=lambda c: c[0])
+    if mirror:
+        # Espelhado: a mão de comandos é a que está na metade esquerda.
+        left = [c for c in candidates if c[0] < half]
+        if not left:
+            return None
+        best = min(left, key=lambda c: c[0])
+    else:
+        # Sem espelho: a mão de comandos é a que está na metade direita.
+        right = [c for c in candidates if c[0] >= half]
+        if not right:
+            return None
+        best = max(right, key=lambda c: c[0])
     return (best[1], best[2], best[3])
 
 
@@ -323,13 +334,14 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
     # Fechar a mao esquerda (so ela presente) = fechar janela (Alt+F4).
     # Uso a POSICAO X da palma (como _command_hand_frame) - nao o label, que o
     # MediaPipe desta camara instabiliza - para garantir que a mao DIREITA
-    # (que fica a X > metade) nunca fecha janelas, mesmo movendo-se.
+    # nunca fecha janelas, mesmo movendo-se. O lado da mao esquerda no ecra
+    # depende do espelho (ver _command_hand_frame).
     cmd_fist = False
     if E.left_hand is not None and not state["paused"] and len(results) == 1:
         only = next(iter(results.values()))[0]
         palm = only.palm_center
         if palm is not None:
-            left_x = palm[0] < (w / 2.0)
+            left_x = palm[0] < (w / 2.0) if cfg.mirror else palm[0] >= (w / 2.0)
             if left_x and only.gesture == Gesture.FIST:
                 cmd_fist = True
     if cmd_fist and not E.cmd_fist_prev:

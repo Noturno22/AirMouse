@@ -71,10 +71,26 @@ class Config:
 
     # Comandos especiais da MAO ESQUERDA (totalmente separada da direita)
     left_hand_commands: bool = True
-    left_hand_swipe_min_px: float = 45.0
+    # Deslocamento X minimo (px) para considerar um swipe; quanto maior, mais
+    # propositado tem de ser o gesto (menos disparos acidentais).
+    left_hand_swipe_min_px: float = 55.0
+    # Dominancia horizontal exigida (|dx| > dom * |dy|): 2.0 exige um swipe
+    # francamente horizontal, reduzindo falsos alt-tab em movimentos diagonais.
+    left_hand_swipe_dom: float = 2.0
+    # Velocidade vertical (px/s) minima para o swipe; impede que uma deriva
+    # lenta da mao dispare a troca de janela.
+    left_hand_swipe_min_speed_px_s: float = 220.0
     left_hand_swipe_window_s: float = 0.5
-    left_hand_cooldown_s: float = 1.1
-    left_hand_scroll_deadzone_px: float = 18.0
+    # Cooldown entre disparos de comandos da mao esquerda (segurar/PEACE/swipe).
+    left_hand_cooldown_s: float = 1.6
+    # Deadzone de scroll vertical; quanto maior, menos tremor desloca o scroll.
+    left_hand_scroll_deadzone_px: float = 24.0
+    # Frames consecutivos que o gesto da mao esquerda tem de manter (ex. PEACE)
+    # antes de disparar, para eliminar flicker de 1 frame.
+    left_hand_gesture_stable_frames: int = 3
+    # Tempo (s) que a mao esquerda pode ficar "perdida" pela camara antes de
+    # reiniciar o detector; evita que um drop de 1 frame anule o hold/PEACE.
+    left_hand_lost_grace_s: float = 0.3
     # Segurar a mao esquerda ABERTA durante este tempo (s) abre o alternador
     # de janelas (pick mode) em vez de apenas avancar uma janela de cada vez.
     left_hand_open_switch_s: float = 2.0

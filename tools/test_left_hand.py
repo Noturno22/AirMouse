@@ -79,6 +79,53 @@ small = [(200.0, 200.0)] * 3
 evs = feed(der, small)
 check("mao parada nao emite", evs == [], str(evs))
 
+# 5a. Deriva lenta (velocidade < minimo) NAO dispara swipe, mesmo com 55px
+der = LeftHandDetector(cfg)
+slow_drift = [
+    (100.0, 200.0), (111.0, 201.0), (122.0, 200.0),
+    (133.0, 202.0), (144.0, 201.0), (155.0, 200.0),
+]
+evs = feed(der, slow_drift, dt=0.1)  # 55px em 0.5s = 110 px/s < minimo
+check("deriva lenta nao dispara swipe",
+      ("alt_tab_forward", None) not in evs and ("alt_tab_back", None) not in evs, str(evs))
+
+# 5b. Swipe rapido controlo (velocidade >= minimo) dispara
+der = LeftHandDetector(cfg)
+fast_swipe = [
+    (100.0, 200.0), (122.0, 201.0), (144.0, 200.0),
+    (166.0, 202.0), (188.0, 201.0), (210.0, 200.0),
+]
+evs = feed(der, fast_swipe, dt=0.1)  # 110px em 0.5s = 220 px/s
+check("swipe rapido dispara alt_tab_forward", ("alt_tab_forward", None) in evs, str(evs))
+
+# 5c. Drop curto (dentro da grace) NAO reinicia o hold do alternador
+der = LeftHandDetector(cfg)
+now = 0.0
+for _ in range(20):  # segurar OPEN 1.0s
+    der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+for _ in range(2):   # drop 0.1s (< grace 0.3)
+    der.update(None, now); now += 0.05
+fired = False
+for _ in range(24):  # segurar mais 1.2s -> total 2.2s continuo
+    ev, _ = der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+    if ev == "alt_switch_open":
+        fired = True
+check("drop curto nao reinicia hold", fired, "")
+
+# 5d. Drop longo (> grace) reinicia o hold do alternador
+der = LeftHandDetector(cfg)
+now = 0.05
+for _ in range(20):  # segurar OPEN 1.0s
+    der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+for _ in range(9):   # drop 0.45s (> grace 0.3) -> reset
+    der.update(None, now); now += 0.05
+fired = False
+for _ in range(20):  # so 1.0s apos reset, insuficiente para 2.0s
+    ev, _ = der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+    if ev == "alt_switch_open":
+        fired = True
+check("drop longo reinicia hold", not fired, "")
+
 # 6. PEACE ("paz") com a mao esquerda -> gui_toggle (rising edge)
 def feed_gesture(det, seq, dt=0.05):
     out = []
@@ -89,13 +136,19 @@ def feed_gesture(det, seq, dt=0.05):
     return out
 
 der = LeftHandDetector(cfg)
-seq_peace = [Gesture.OPEN, Gesture.PEACE]
+# Anti-flicker: um unico frame de PEACE nao dispara (precisa de N consecutivos)
+evs = feed_gesture(der, [Gesture.OPEN, Gesture.PEACE, Gesture.OPEN])
+check("flicker 1 frame PEACE nao dispara", ("gui_toggle", None) not in evs, str(evs))
+
+# 6. PEACE mantido N frames consecutivos -> gui_toggle (rising edge)
+der = LeftHandDetector(cfg)
+seq_peace = [Gesture.OPEN] + [Gesture.PEACE] * cfg.left_hand_gesture_stable_frames
 evs = feed_gesture(der, seq_peace)
 check("PEACE mao esquerda -> gui_toggle", ("gui_toggle", None) in evs, str(evs))
 
 # 7. Segurar PEACE nao repete o toggle (disparo unico enquanto parada no gesto)
 der = LeftHandDetector(cfg)
-seq_hold = [Gesture.OPEN, Gesture.PEACE, Gesture.PEACE, Gesture.PEACE]
+seq_hold = [Gesture.OPEN] + [Gesture.PEACE] * (cfg.left_hand_gesture_stable_frames + 2)
 evs = feed_gesture(der, seq_hold)
 toggles = [e for e, _ in evs if e == "gui_toggle"]
 check("segurar PEACE dispara uma so vez", toggles == ["gui_toggle"], str(evs))
@@ -109,15 +162,19 @@ check("sem PEACE -> sem gui_toggle", ("gui_toggle", None) not in evs, str(evs))
 der = LeftHandDetector(cfg)
 evs = []
 now = 0.0
-for g in (Gesture.OPEN, Gesture.PEACE, Gesture.OPEN):
+for g in (Gesture.OPEN,) + (Gesture.PEACE,) * cfg.left_hand_gesture_stable_frames:
     ev, val = der.update((200.0, 200.0), now, g)
     if ev is not None:
         evs.append((ev, val))
     now += 0.05
+# Largar o PEACE (re-armar) e esperar o cooldown
+ev, val = der.update((200.0, 200.0), now, Gesture.OPEN)
 now += cfg.left_hand_cooldown_s + 0.1
-ev, val = der.update((200.0, 200.0), now, Gesture.PEACE)
-if ev is not None:
-    evs.append((ev, val))
+for _ in range(cfg.left_hand_gesture_stable_frames):
+    ev, val = der.update((200.0, 200.0), now, Gesture.PEACE)
+    if ev is not None:
+        evs.append((ev, val))
+    now += 0.05
 count = sum(1 for e, _ in evs if e == "gui_toggle")
 check("novo PEACE apos cooldown volta a ligar/desligar", count == 2, str(evs))
 
