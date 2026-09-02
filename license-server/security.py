@@ -34,11 +34,14 @@ def _load_public_key_embedded():
 
 
 def _load_public_key():
-    """Prefere env AIRMOUSE_LS_PUBLIC_KEY; senão lê public.pem emparelhado."""
+    """Prefere env AIRMOUSE_LS_PUBLIC_KEY (caminho para public.pem ou PEM);
+    senão lê public.pem emparelhado ao lado de private.pem."""
     pub_pem = os.getenv("AIRMOUSE_LS_PUBLIC_KEY", "")
     if pub_pem:
-        from cryptography.hazmat.primitives import serialization as _ser
-        return _ser.load_pem_public_key(pub_pem.encode())
+        if os.path.isfile(pub_pem):
+            with open(pub_pem, "rb") as fh:
+                return serialization.load_pem_public_key(fh.read())
+        return serialization.load_pem_public_key(pub_pem.encode())
     return _load_public_key_embedded()
 
 

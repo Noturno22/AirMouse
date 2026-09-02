@@ -47,6 +47,16 @@ class TrialReportRequest(BaseModel):
     used_seconds: int
 
 
+class RevalidateRequest(BaseModel):
+    machine_id: str
+    old_lease: str
+
+
+class RevokeRequest(BaseModel):
+    machine_id: str
+    admin_token: str
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="AirMouse License Server")
 
@@ -103,6 +113,23 @@ def create_app() -> FastAPI:
     def trial_status(machine_id: str, db=Depends(get_db)):
         return {"machine_id": machine_id,
                 "remaining_seconds": trial_remaining(db, machine_id)}
+
+    from service import revalidate, revoke_machine
+
+    @app.post("/api/v1/revalidate")
+    def api_revalidate(req: RevalidateRequest, db=Depends(get_db)):
+        try:
+            lease = revalidate(db, req.machine_id.strip(), req.old_lease.strip())
+        except ValueError as exc:
+            return JSONResponse(status_code=403, content={"error": str(exc)})
+        return {"tier": "pro", "lease": lease}
+
+    @app.post("/api/v1/revoke")
+    def api_revoke(req: RevokeRequest, db=Depends(get_db)):
+        if not authorized(req.admin_token):
+            return JSONResponse(status_code=403, content={"error": "forbidden"})
+        revoke_machine(db, req.machine_id)
+        return {"ok": True}
 
     return app
 

@@ -62,6 +62,38 @@ def trial_report(conn, machine_id: str, used_seconds: int) -> int:
     return trial_remaining(conn, machine_id)
 
 
+from security import decode_jwt, issue_lease
+from storage import (set_last_use_seq, get_last_use_seq, touch_last_seen,
+                     delete_machine, bump_revocation_nonce)
+
+
+def revalidate(conn, machine_id: str, old_lease: str) -> str:
+    """Valida o lease antigo (assinatura ES256) e emite um novo (7 dias).
+    Não renova leases com nonce obsoleto nem seq repetido. Actualiza last_seen."""
+    try:
+        claims = decode_jwt(old_lease)
+    except Exception:
+        raise ValueError("lease_invalido")
+    if claims["sub"] != f"machine:{machine_id}":
+        raise ValueError("maquina_diferente")
+    if claims["revocation_nonce"] < get_current_nonce_helper(conn):
+        raise ValueError("nonce_obsoleto")
+    last_seq = get_last_use_seq(conn, machine_id)
+    new_seq = int(claims["use_seq"]) + 1
+    if last_seq is not None and new_seq <= last_seq:
+        raise ValueError("seq_repetido")
+    set_last_use_seq(conn, machine_id, new_seq)
+    touch_last_seen(conn, machine_id)
+    key_hash = claims["key_hash"]
+    return issue_lease(machine_id, key_hash, get_current_nonce_helper(conn),
+                       claims["session_id"], new_seq)
+
+
+def revoke_machine(conn, machine_id: str) -> int:
+    delete_machine(conn, machine_id)
+    return bump_revocation_nonce(conn)
+
+
 def activate(conn, key: str, machine_id: str) -> tuple[str, str, int]:
     """Liga uma chave a uma máquina e emite um lease ES256.
 
