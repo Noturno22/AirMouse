@@ -38,6 +38,61 @@ from core.twohand import (
 log = get_logger("engine")
 
 MOVE_GESTURES = frozenset({Gesture.OPEN, Gesture.ONE, Gesture.PINCH})
+
+
+def _command_hand_frame(results, mirror: bool, frame_w: int):
+    """Devolve o HandFrame da MAO DE COMANDOS = mão esquerda física, escolhida
+    pela POSICAO X no ecra (fiável), em vez do label MediaPipe (instável nesta
+    câmara — chega a marcar as duas como 'Right' e a oscilar).
+
+    Com o espelho ativo + tracking no frame espelhado, a mão esquerda física
+    fica na METADE ESQUERDA do ecra (x < frame_w/2). Requerir X na metade
+    esquerda evita que a mão direita do cursor (sozinha) seja tratada como
+    mão de comandos.
+    """
+    if not results:
+        return None
+    half = frame_w / 2.0
+    candidates = []
+    for _label, (hf, event, ev_value) in results.items():
+        palm = hf.palm_center
+        if palm is None:
+            continue
+        candidates.append((palm[0], hf, event, ev_value))
+    if not candidates:
+        return None
+    # Só uma mão na METADE ESQUERDA é a de comandos. Se não há nenhuma mão à
+    # esquerda, não há mão de comandos (a mão direita sozinha é só o cursor),
+    # para a mão direita não abrir o alternador/scroll enquanto se move.
+    left = [c for c in candidates if c[0] < half]
+    if not left:
+        return None
+    best = min(left, key=lambda c: c[0])
+    return (best[1], best[2], best[3])
+
+
+def _cursor_hand_frame(results, frame_w: int):
+    """Devolve o HandFrame do CURSOR = mão direita física, escolhida pela
+    maior POSICAO X (fiável), tal como _command_hand_frame usa a menor X.
+
+    Com o espelho + tracking no frame espelhado, a mão direita física fica a
+    X > frame_w/2. Escolher por X (em vez do label 'Left'/'Right', que o
+    MediaPipe desta câmara marca de forma instável) garante que o cursor segue
+    sempre a mão direita, quer o MediaPipe devolva ['Right','Right'] ou
+    ['Left','Right'].
+    """
+    if not results:
+        return None
+    best = None
+    best_x = -1.0
+    for _label, (hf, event, ev_value) in results.items():
+        palm = hf.palm_center
+        if palm is None:
+            continue
+        if palm[0] > best_x:
+            best_x = palm[0]
+            best = (hf, event, ev_value)
+    return best
 ALT_HOLD_TIMEOUT_S = 1.3
 
 
@@ -64,7 +119,11 @@ def make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx):
         min_reversals=cfg.wave_min_reversals, window_s=cfg.wave_window_s,
         min_amplitude_px=cfg.wave_min_amplitude_px,
     )
-    left_hand = LeftHandDetector(cfg) if cfg.left_hand_commands else None
+    # Semantic: a LeftHandDetector instancia-se SEMPRE, para que o gesto PEACE da
+    # mao esquerda possa mostrar/ocultar a interface mesmo no Free; os comandos
+    # (swipe/alternador/scroll) são desligados por allow_commands=left_hand_commands
+    # (recurso Pro-locked). Em Pro, left_hand_commands=True => comando completo.
+    left_hand = LeftHandDetector(cfg, allow_commands=cfg.left_hand_commands)
     light = LightBoost() if cfg.low_light_boost else None
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
@@ -106,7 +165,7 @@ def make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx):
         active_side=("Right" if not cfg.mirror else "Left"),
         last_accept_t=None, last_hand_t=None, dt_ema=0.05,
         exposure_tried=False, gray_check=0,
-        left_peace_prev=False, right_peace_prev=False, cmd_fist_prev=False,
+        right_peace_prev=False, cmd_fist_prev=False,
     )
 
 
@@ -167,19 +226,22 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
     hand_frame = None
 
     if results:
-        if E.active_side in results:
-            hand_frame, event, ev_value = results[E.active_side]
-        else:
-            prev_active = E.active_side
-            E.active_side = E.cursor_side if E.cursor_side in results else next(iter(results))
-            hand_frame, event, ev_value = results[E.active_side]
-            if prev_active is not None:
-                E.filters.reset()
-                E.last_palm = None
-                E.prev_filtered = None
-                E.jump_streak = 0
-                E.fast_until = 0.0
-                E.emitter.clear()
+        # Cursor = mão direita física pela MAIOR X (estável), não pelo label.
+        cur = _cursor_hand_frame(results, w)
+        if cur is not None:
+            hand_frame, event, ev_value = cur
+            if E.active_side not in results or results[E.active_side][0] is not hand_frame:
+                prev_active = E.active_side
+                E.active_side = next(
+                    s for s, (hf, _e, _v) in results.items() if hf is hand_frame
+                )
+                if prev_active is not None:
+                    E.filters.reset()
+                    E.last_palm = None
+                    E.prev_filtered = None
+                    E.jump_streak = 0
+                    E.fast_until = 0.0
+                    E.emitter.clear()
 
     all_frames = {s: r[0] for s, r in results.items()}
     E.ui["hands"] = len(results)
@@ -206,9 +268,12 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
     #   * Segurar a mão ABERTA ~2s -> abrir o alternador de janelas (pick mode);
     #     enquanto estiver aberto, os swipes navegam sem soltar o Alt e soltar a
     #     mão confirma a escolha.
-    #   * Abrir/fechar 3x -> mostra/oculta a interface GUI.
+    #   * PEACE (paz) -> mostra/oculta a interface GUI.
     if E.left_hand is not None and not state["paused"]:
-        lhf = results[E.command_side][0] if E.command_side in results else None
+        # Mão de comandos escolhida pela posição X no ecrã (mão esquerda física),
+        # não pelo label MediaPipe — que oscila/marca as duas como 'Right'.
+        lhf = _command_hand_frame(results, cfg.mirror, w)
+        lhf = lhf[0] if lhf is not None else None
         lpalm = lhf.palm_center if lhf is not None else None
         lgesture = lhf.gesture if lhf is not None else None
         left_cmd, left_cmd_val = E.left_hand.update(lpalm, now, lgesture)
@@ -255,36 +320,30 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
             E.alt_hold = False
             E.switcher_pick = False
 
-    # Fechar a mao de comandos (so ela presente) = fechar janela (Alt+F4)
-    # O gesto de abrir/fechar a mao 3x (mostrar/ocultar interface) passa por
-    # estados FIST transitorios; durante esse pump não deve fechar janelas,
-    # caso contrário o Alt+F4 disparava no meio do gesto e fechava tudo.
-    cmd_fist = (
-        E.left_hand is not None
-        and not state["paused"]
-        and len(results) == 1
-        and E.command_side in results
-        and results[E.command_side][0].gesture == Gesture.FIST
-        and now >= E.left_hand.pumping_until
-    )
+    # Fechar a mao esquerda (so ela presente) = fechar janela (Alt+F4).
+    # Uso a POSICAO X da palma (como _command_hand_frame) - nao o label, que o
+    # MediaPipe desta camara instabiliza - para garantir que a mao DIREITA
+    # (que fica a X > metade) nunca fecha janelas, mesmo movendo-se.
+    cmd_fist = False
+    if E.left_hand is not None and not state["paused"] and len(results) == 1:
+        only = next(iter(results.values()))[0]
+        palm = only.palm_center
+        if palm is not None:
+            left_x = palm[0] < (w / 2.0)
+            if left_x and only.gesture == Gesture.FIST:
+                cmd_fist = True
     if cmd_fist and not E.cmd_fist_prev:
         _keyboard_shortcut("alt+f4")
         E.toast("FECHAR JANELA (Alt+F4)")
     E.cmd_fist_prev = cmd_fist
 
-    # Luminosidade com Dois Dedos (PEACE) na mao: esquerda diminui, direita aumenta.
-    left_peace = False
+    # Luminosidade com Dois Dedos (PEACE) na mao DIREITA: aumenta o brilho.
+    # (PEACE na mao esquerda agora liga/desliga a interface GUI.)
     right_peace = False
-    if len(results) == 2:
-        if "Left" in results:
-            left_peace = results["Left"][0].gesture == Gesture.PEACE
-        if "Right" in results:
-            right_peace = results["Right"][0].gesture == Gesture.PEACE
-    if left_peace and not E.left_peace_prev:
-        E.toast(E.brightness.decrease())
+    if len(results) == 2 and "Right" in results:
+        right_peace = results["Right"][0].gesture == Gesture.PEACE
     if right_peace and not E.right_peace_prev:
         E.toast(E.brightness.increase())
-    E.left_peace_prev = left_peace
     E.right_peace_prev = right_peace
 
     mag_note = None

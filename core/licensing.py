@@ -246,7 +246,26 @@ def _default_store_path() -> str:
     return os.path.join(base, "AirMouse", "license.json")
 
 
+# Armazena o LicenseManager ativo, definido pelo main no arranque. Usado pelo
+# runtime (UI, voz, snap) para bloquear toggles/ordens Pro-locked no tier Free.
+_ACTIVE: "LicenseManager | None" = None
+
+
+def set_active_license(manager: "LicenseManager") -> None:
+    global _ACTIVE
+    _ACTIVE = manager
+
+
+def active_license() -> "LicenseManager":
+    return _ACTIVE or LicenseManager()
+
+
+def active_tier() -> Tier:
+    return active_license().tier
+
+
 __all__ = [
     "Tier", "PRO_LOCKED", "entitlements", "is_pro_locked",
     "LicenseManager", "LicenseAgency",
+    "set_active_license", "active_license", "active_tier",
 ]

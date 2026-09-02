@@ -79,7 +79,7 @@ small = [(200.0, 200.0)] * 3
 evs = feed(der, small)
 check("mao parada nao emite", evs == [], str(evs))
 
-# 6. Abrir/fechar a mao 3x (OPEN<->FIST, 3 transicoes) -> gui_toggle
+# 6. PEACE ("paz") com a mao esquerda -> gui_toggle (rising edge)
 def feed_gesture(det, seq, dt=0.05):
     out = []
     for i, g in enumerate(seq):
@@ -89,17 +89,39 @@ def feed_gesture(det, seq, dt=0.05):
     return out
 
 der = LeftHandDetector(cfg)
-seq3 = [Gesture.OPEN, Gesture.FIST, Gesture.OPEN, Gesture.FIST]
-evs = feed_gesture(der, seq3)
-check("abrir/fechar 3x -> gui_toggle", ("gui_toggle", None) in evs, str(evs))
+seq_peace = [Gesture.OPEN, Gesture.PEACE]
+evs = feed_gesture(der, seq_peace)
+check("PEACE mao esquerda -> gui_toggle", ("gui_toggle", None) in evs, str(evs))
 
-# 7. Apenas 2 transicoes nao devem disparar gui_toggle
+# 7. Segurar PEACE nao repete o toggle (disparo unico enquanto parada no gesto)
 der = LeftHandDetector(cfg)
-seq2 = [Gesture.OPEN, Gesture.FIST, Gesture.OPEN]
-evs = feed_gesture(der, seq2)
-check("abrir/fechar 2x -> sem gui_toggle", evs == [], str(evs))
+seq_hold = [Gesture.OPEN, Gesture.PEACE, Gesture.PEACE, Gesture.PEACE]
+evs = feed_gesture(der, seq_hold)
+toggles = [e for e, _ in evs if e == "gui_toggle"]
+check("segurar PEACE dispara uma so vez", toggles == ["gui_toggle"], str(evs))
 
-# 8. Swipe continua a funcionar mesmo com gesture presente (sem disparo de pump)
+# 8. OPEN/FIST (sem PEACE) nao dispara gui_toggle
+der = LeftHandDetector(cfg)
+evs = feed_gesture(der, [Gesture.OPEN, Gesture.OPEN])
+check("sem PEACE -> sem gui_toggle", ("gui_toggle", None) not in evs, str(evs))
+
+# 8b. Sair do PEACE e voltar a fazer (apos o cooldown) volta a ligar/desligar
+der = LeftHandDetector(cfg)
+evs = []
+now = 0.0
+for g in (Gesture.OPEN, Gesture.PEACE, Gesture.OPEN):
+    ev, val = der.update((200.0, 200.0), now, g)
+    if ev is not None:
+        evs.append((ev, val))
+    now += 0.05
+now += cfg.left_hand_cooldown_s + 0.1
+ev, val = der.update((200.0, 200.0), now, Gesture.PEACE)
+if ev is not None:
+    evs.append((ev, val))
+count = sum(1 for e, _ in evs if e == "gui_toggle")
+check("novo PEACE apos cooldown volta a ligar/desligar", count == 2, str(evs))
+
+# 9. Swipe continua a funcionar mesmo com gesture presente (sem disparo de gui_toggle)
 der = LeftHandDetector(cfg)
 swipe_fwd_open = [
     (100.0, 200.0), (120.0, 201.0), (140.0, 202.0),
@@ -173,26 +195,84 @@ while now < end:
     now += hold_dt
 check("segurar de novo apos largar reabre", opens == 2, f"opens={opens}")
 
-# 13. Durante um pump (abrir/fechar 3x) o punho NÃO deve fechar a janela:
-#     pumping_until fica no futuro, usado pelo main para suprimir Alt+F4.
-der = LeftHandDetector(cfg)
+# ── Modo Free (allow_commands=False): PEACE funciona, comandos nao ────
+free = LeftHandDetector(cfg, allow_commands=False)
+
+# 13. PEACE com a mao esquerda AINDA mostra/oculta a interface no Free
 now = 0.0
-seq3 = [Gesture.OPEN, Gesture.FIST, Gesture.OPEN, Gesture.FIST]
-for g in seq3:
-    _, _ = der.update((200.0, 200.0), now, g)
-    now += 0.05
-check("pump ativo suprime punho", der.pumping_until > 0.0,
-      f"until={der.pumping_until}")
+init = free.update((200.0, 200.0), now, Gesture.FIST)
+now += 0.2
+evs = []
+for g in (Gesture.PEACE, Gesture.PEACE, Gesture.PEACE):
+    now += cfg.left_hand_cooldown_s + 0.4
+    ev, val = free.update((200.0, 200.0), now, g)
+    if ev is not None:
+        evs.append(ev)
+check("FREE: PEACE mao esquerda -> gui_toggle", ("gui_toggle", None) in evs or "gui_toggle" in evs, str(evs))
 
-# 14. Um punho solto simples (sem alternancia previa) NÃO suprime:
-#     primeira frame FIST de uma mao que ja esta na vista -> pumping_until = 0
-der = LeftHandDetector(cfg)
-der.update((200.0, 200.0), 0.0, Gesture.FIST)
-der.update((200.0, 200.0), 0.05, Gesture.FIST)
-check("punho simples nao suprime (pumping_until=0)",
-      der.pumping_until == 0.0, f"until={der.pumping_until}")
+# 14. O swipe NAO dispara no Free (comandos desligados)
+free2 = LeftHandDetector(cfg, allow_commands=False)
+evs = feed(free2, swipe_right)
+check("FREE: swipe nao dispara alt_tab", not any(e == "alt_tab_forward" for e, _ in evs), str(evs))
 
+# 15. Segurar mao aberta NAO abre o alternador no Free
+free3 = LeftHandDetector(cfg, allow_commands=False)
+now = 0.0
+sw_evs = []
+hold_dt = 0.05
+while now < cfg.left_hand_open_switch_s + 0.3:
+    ev, val = free3.update((200.0, 200.0), now, Gesture.OPEN)
+    if ev is not None:
+        sw_evs.append(ev)
+    now += hold_dt
+check("FREE: segurar aberta nao abre alternador",
+      "alt_switch_open" not in sw_evs, str(sw_evs))
 
+# 16. Scroll vertical NAO dispara no Free
+free4 = LeftHandDetector(cfg, allow_commands=False)
+evs = feed(free4, [(100.0, 100.0), (100.0, 120.0), (100.0, 140.0),
+                   (100.0, 160.0), (100.0, 180.0), (100.0, 200.0)])
+check("FREE: scroll nao dispara", not any(e == "scroll" for e, _ in evs), str(evs))
+
+# ── Fix espacial: a mao de comandos é a mais à esquerda do ecra ─────────
+from core.engine import _command_hand_frame
+
+# _command_hand_frame recebe dict {label: (HandFrame, event, value)}. HandFrame
+# precisa de palm_center; criamos objetos mínimos via types.SimpleNamespace.
+import types  # noqa: E402
+
+def mk_frame(x, y):
+    return types.SimpleNamespace(palm_center=(x, y))
+
+# 17. Duas maos com o MESMO label 'Right' (falha real do MediaPipe): a de
+# comandos deve ser a de menor X (mais à esquerda do ecra), independentemente
+# dos labels serem iguais/instáveis.
+res_both_right = {
+    "Right": (mk_frame(400.0, 200.0), None, None),
+    "Right2": (mk_frame(120.0, 180.0), None, None),
+}
+sel = _command_hand_frame(res_both_right, mirror=True, frame_w=640)
+check("espacial: 2x'Right' -> escolhe menor X na metade esquerda",
+      sel is not None and sel[0].palm_center[0] == 120.0,
+      str(sel[0].palm_center) if sel else "None")
+
+# 18. Com labels trocados (o MediaPipe rotulou a mao esquerda como 'Left'), a
+# seleção espacial continua a apanhar a esquerda pela posição, não pelo label.
+res_troca = {
+    "Left": (mk_frame(600.0, 200.0), None, None),
+    "Right": (mk_frame(90.0, 180.0), None, None),
+}
+sel2 = _command_hand_frame(res_troca, mirror=True, frame_w=640)
+check("espacial: labels trocados ainda escolhe menor X",
+      sel2 is not None and sel2[0].palm_center[0] == 90.0,
+      str(sel2[0].palm_center) if sel2 else "None")
+
+# 19. Mão direita SOZINHA (x no lado direito) NÃO é tratada como mão de
+# comandos → evita que mover o cursor com a direita abra o alternador.
+res_dir_sozinha = {"Left": (mk_frame(500.0, 200.0), None, None)}
+sel3 = _command_hand_frame(res_dir_sozinha, mirror=True, frame_w=640)
+check("espacial: maodireita sozinha (X>half) nao e a de comandos",
+      sel3 is None, str(sel3[0].palm_center) if sel3 else "None")
 
 print(f"\n{passed} PASS / {failed} FAIL")
 sys.exit(1 if failed else 0)

@@ -1,8 +1,9 @@
 {
-  "move_gain": 1.92,
-  "suavidade": "NORMAL",
-  "filter_min_cutoff": 1.4,
-  "filter_beta": 0.028,
+  "move_gain": 2.4,
+  "suavidade": "REACTIVO",
+  "filter_min_cutoff": 2.2,
+  "filter_beta": 0.05,
+  "tracker_threads": 4,
   "snap_enabled": false,
   "mirror": true,
   "left_hand_commands": true,

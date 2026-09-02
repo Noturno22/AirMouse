@@ -34,7 +34,7 @@ class GestureBadge(QLabel):
         self._last_color = color_name
         self.setText(text)
         self.setStyleSheet(
-            f"background-color: rgba(10,10,18,204);"
+            f"background-color: rgba(0,0,0,204);"
             f"border: 2px solid {color.name()};"
             f"border-radius: 6px;"
             f"color: {color.name()};"

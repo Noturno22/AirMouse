@@ -193,13 +193,29 @@ class HandPool:
         }
         self._seen = set()
 
+    def _palm_center(self, hand):
+        """Centro X (pulso + base dos dedos) de uma detecao, normalizado."""
+        return (hand[0][0] + hand[9][0]) / 2.0 if len(hand) > 9 else hand[0][0]
+
     def update(self, hands, sides, width, height):
+        # O MediaPipe por vezes devolve A MESMA mao real detetada 2x (labels
+        # iguais, palma quase na mesma posicao) - isto NAO sao duas maos e nao
+        # devia gerar uma segunda entidade (falso "2 maos" no Free, gestos de
+        # 2 maos indevidos). Descarta a duplicata quando as palmas coincidem.
+        kept = []
+        for hand, side in zip(hands, sides):
+            cx = self._palm_center(hand)
+            if any(abs(kx - cx) < 0.18 for kx, _, _ in kept):
+                continue
+            kept.append((cx, side, hand))
+        # Com 1 mao real mantemos o label original; com 2 maos reais distintas
+        # opomos os labels (o MediaPipe desta camara marca ambas "Right").
         results = {}
         seen = set()
-        for hand, side in zip(hands, sides):
+        for i, (cx, side, hand) in enumerate(kept):
             label = side if side in self.engines else "Right"
-            if label in results:
-                continue
+            if label in seen:
+                label = "Left" if label == "Right" else "Right"
             seen.add(label)
             results[label] = self.engines[label].update(hand, width, height)
         for label in self.engines:
@@ -472,8 +488,12 @@ class LeftHandDetector:
       ('scroll', value)  valor acumulado de scroll vertical
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, allow_commands=True):
         self.cfg = cfg
+        # No Free, o PEACE (paz) com a mao esquerda continua a funcionar para
+        # mostrar/ocultar a interface, mas os comandos (swipe/alternador/scroll)
+        # ficam desligados (sao recursos Pro).
+        self.allow_commands = allow_commands
         self.reset()
 
     def reset(self):
@@ -481,11 +501,11 @@ class LeftHandDetector:
         self._scroll_prev_y = None
         self._scroll_acc = 0.0
         self._swipe_until = 0.0
-        # Contagem de "abrir/fechar" (OPEN <-> FIST) sempre neste estado:
-        # _pump_state guarda o estado de gesto aceite como transicao anterior.
-        self._pump_state = None
-        self._pump_count = 0
-        self._pump_until = 0.0
+        # PEACE ("paz") com a mao esquerda mostra/oculta a interface (GUI).
+        # _peace_on guarda o estado do gesto da frame anterior (rising edge) e
+        # _toggle_until e o cooldown contra disparos repetidos ao manter o gesto.
+        self._peace_on = False
+        self._toggle_until = 0.0
         # "Pick mode" (escolher janela): mao esquerda aberta e mantida durante
         # alguns segundos abre o alternador de janelas. Enquanto o pick mode
         # estiver ativo, os swipes navegam sem soltar o Alt.
@@ -495,7 +515,7 @@ class LeftHandDetector:
     def update(self, palm, now, gesture=None):
         """palm: (x, y) em px, ou None se a mao esquerda nao estiver visivel.
         gesture: opcional (Gesture) da mao esquerda, usado para o gesto de
-        abrir/fechar 3x que mostra/oculta a interface."""
+        paz (PEACE) que mostra/oculta a interface."""
         cfg = self.cfg
         if palm is None:
             self.reset()
@@ -508,29 +528,27 @@ class LeftHandDetector:
         ev = None
         val = None
 
-        # Abrir/fechar a mao 3x (OPEN <-> FIST repetidamente) -> gui_toggle.
-        # Cada alternancia conta uma transicao; precisamos de 3 num janela.
+        # PEACE ("paz") com a mao esquerda -> mostrar/ocultar a interface (GUI).
+        # Dispara na transicao para PEACE (rising edge) e tem cooldown para nao
+        # repetir enquanto a mao ficar parada no gesto.
         if gesture is not None:
-            if gesture in (Gesture.OPEN, Gesture.FIST):
-                if self._pump_state is not None and gesture != self._pump_state:
-                    self._pump_count += 1
-                    self._pump_state = gesture
-                    self._pump_until = now + cfg.left_hand_swipe_window_s
-                    if self._pump_count >= cfg.left_hand_gui_toggle_cycles:
-                        ev = "gui_toggle"
-                        self._pump_count = 0
-                        self._pump_state = None
-                        return ev, None
-                elif self._pump_state is None:
-                    self._pump_state = gesture
-            elif now >= self._pump_until:
-                self._pump_state = None
-                self._pump_count = 0
+            if gesture == Gesture.PEACE:
+                if not self._peace_on and now >= self._toggle_until:
+                    self._toggle_until = now + cfg.left_hand_cooldown_s
+                    ev = "gui_toggle"
+                    val = None
+                    self._samples.clear()
+                    self._scroll_acc = 0.0
+                    self._scroll_prev_y = None
+                self._peace_on = True
+            else:
+                self._peace_on = False
 
         # Pick mode: segurar a mao ABERTA durante N segundos abre o alternador.
         # Apos disparar, mantem-se ativo enquanto a mao continuar aberta; os
         # swipes seguintes navegam no alternador sem soltar (handled em main).
-        if gesture == Gesture.OPEN:
+        # (Pro-locked: no Free, allow_commands=False desliga swipe/alternador/scroll.)
+        if self.allow_commands and gesture == Gesture.OPEN:
             if self._open_since is None:
                 self._open_since = now
             elif not self._switcher_open and now - self._open_since >= cfg.left_hand_open_switch_s:
@@ -541,43 +559,34 @@ class LeftHandDetector:
             self._open_since = None
             self._switcher_open = False
 
-        # SWIPE horizontal: deslocamento X dominante e rapido dentro da janela
-        if now >= self._swipe_until and len(self._samples) >= 3:
-            x0 = self._samples[0][0]
-            dx = px - x0
-            dy = py - self._samples[0][1]
-            if abs(dx) >= cfg.left_hand_swipe_min_px and abs(dx) > abs(dy) * 1.5:
-                ev = "alt_tab_forward" if dx > 0 else "alt_tab_back"
-                val = None
-                self._swipe_until = now + cfg.left_hand_cooldown_s
-                self._samples.clear()
-                self._scroll_acc = 0.0
-                self._scroll_prev_y = None
-
-        # Scroll vertical continuo (dominancia vertical, fora de cooldown de swipe)
-        if ev is None:
-            if self._scroll_prev_y is not None:
-                dy = py - self._scroll_prev_y
-                if abs(dy) >= cfg.left_hand_scroll_deadzone_px:
-                    direction = 1 if dy < 0 else -1
-                    self._scroll_acc += direction * abs(dy)
-                elif abs(py - self._samples[0][1]) > abs(px - self._samples[0][0]):
+        # SWIPE horizontal + Scroll continuo (Pro-locked: no Free ficam desligados).
+        if self.allow_commands:
+            # SWIPE horizontal: deslocamento X dominante e rapido dentro da janela
+            if now >= self._swipe_until and len(self._samples) >= 3:
+                x0 = self._samples[0][0]
+                dx = px - x0
+                dy = py - self._samples[0][1]
+                if abs(dx) >= cfg.left_hand_swipe_min_px and abs(dx) > abs(dy) * 1.5:
+                    ev = "alt_tab_forward" if dx > 0 else "alt_tab_back"
+                    val = None
+                    self._swipe_until = now + cfg.left_hand_cooldown_s
+                    self._samples.clear()
                     self._scroll_acc = 0.0
-            self._scroll_prev_y = py
-            if abs(self._scroll_acc) >= cfg.left_hand_scroll_deadzone_px:
-                ev = "scroll"
-                val = self._scroll_acc
-                self._scroll_acc = 0.0
+                    self._scroll_prev_y = None
+
+            # Scroll vertical continuo (dominancia vertical, fora de cooldown de swipe)
+            if ev is None:
+                if self._scroll_prev_y is not None:
+                    dy = py - self._scroll_prev_y
+                    if abs(dy) >= cfg.left_hand_scroll_deadzone_px:
+                        direction = 1 if dy < 0 else -1
+                        self._scroll_acc += direction * abs(dy)
+                    elif abs(py - self._samples[0][1]) > abs(px - self._samples[0][0]):
+                        self._scroll_acc = 0.0
+                self._scroll_prev_y = py
+                if abs(self._scroll_acc) >= cfg.left_hand_scroll_deadzone_px:
+                    ev = "scroll"
+                    val = self._scroll_acc
+                    self._scroll_acc = 0.0
 
         return ev, val
-
-    @property
-    def pumping_until(self):
-        """Timestamp ate ao qual o gesto de abrir/fechar (pump) esta a decorrer.
-
-        Usado para suprimir o gesto de fechar janela (punho -> Alt+F4) durante
-        os estados FIST transitorios que fazem parte do pump (abrir/fechar a
-        mao 3x = mostrar/ocultar interface). Fora de um pump devolve 0,
-        pelo que o punho solto continua a fechar a janela normalmente.
-        """
-        return self._pump_until

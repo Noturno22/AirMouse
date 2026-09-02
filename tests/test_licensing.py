@@ -121,3 +121,31 @@ def test_open_checkout_calls_browser(monkeypatch):
     lm = lic.LicenseManager()
     assert lm.open_checkout("lifetime", vendor_id=1234) is True
     assert "checkout.paddle.com" in opened["url"]
+
+
+# ── Runtime gate (active_license / active_tier) ────────────────────────
+def test_active_license_defaults_to_free():
+    # Sem set_active_license, o runtime cai para Free (nunca concede Pro de graça).
+    assert lic.active_tier() == lic.Tier.FREE
+    lm = lic.active_license()
+    assert not lm.is_pro
+
+
+def test_set_active_license_and_tier():
+    lm = lic.LicenseManager(secret="s")
+    key = lm.issue_pro_key("a@b.c")
+    lm.activate(key)
+    lic.set_active_license(lm)
+    assert lic.active_tier() == lic.Tier.PRO
+    assert lic.active_license().is_pro
+    # Reset para não contaminar outros testes.
+    lic.set_active_license(lic.LicenseManager())
+
+
+def test_runtime_is_pro_locked_for_voice_on_free():
+    # O gate usa is_pro_locked(active_tier(), feature): no Free, voice é bloqueado.
+    lic.set_active_license(lic.LicenseManager())
+    assert lic.is_pro_locked(lic.active_tier(), "voice")
+    assert lic.is_pro_locked(lic.active_tier(), "snap")
+    # Mas move/clique são sempre livres.
+    assert not lic.is_pro_locked(lic.active_tier(), "move")

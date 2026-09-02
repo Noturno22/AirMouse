@@ -44,7 +44,7 @@ class VoiceBar(QLabel):
         self._last = (txt, color_name)
         self.setText(txt)
         self.setStyleSheet(
-            f"background-color: rgba(10,10,18,204);"
+            f"background-color: rgba(0,0,0,204);"
             f"border: 1px solid {color_name}; border-radius: 4px;"
             f"color: {color_name}; padding: 4px 10px;"
         )

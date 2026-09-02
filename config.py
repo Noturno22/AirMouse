@@ -75,7 +75,6 @@ class Config:
     left_hand_swipe_window_s: float = 0.5
     left_hand_cooldown_s: float = 1.1
     left_hand_scroll_deadzone_px: float = 18.0
-    left_hand_gui_toggle_cycles: int = 3
     # Segurar a mao esquerda ABERTA durante este tempo (s) abre o alternador
     # de janelas (pick mode) em vez de apenas avancar uma janela de cada vez.
     left_hand_open_switch_s: float = 2.0
