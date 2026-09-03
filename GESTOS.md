@@ -1,4 +1,4 @@
-# AirMouse - Gestos e Atalhos
+# Mãouse - Gestos e Atalhos
 
 Referencia completa de todos os gestos, atalhos de teclado e comandos de voz.
 
@@ -79,7 +79,7 @@ A mao de comandos nunca move o cursor; so dispara acoes.
 
 ---
 
-## Atalhos de Teclado (enquanto o AirMouse esta ativo)
+## Atalhos de Teclado (enquanto o Mãouse esta ativo)
 
 | Tecla | Accao |
 |---|---|
@@ -93,7 +93,7 @@ A mao de comandos nunca move o cursor; so dispara acoes.
 | `H` | Mostrar/ocultar overlay de ajuda (F1 na janela da UI) |
 | `M` | Toggle snap magnetico |
 | `B` | Abrir assistente 3D |
-| `Espaco` | Pausar/retomar AirMouse |
+| `Espaco` | Pausar/retomar Mãouse |
 | `Q` / `Esc` | Sair |
 
 ### Presets de suavidade
@@ -116,8 +116,8 @@ Diga **"Jarvis"** (wake word) seguido de um destes comandos:
 | "clique direito" | Clique direito |
 | "sobe" / "cima" | Scroll para cima |
 | "desce" / "baixo" | Scroll para baixo |
-| "pausa" / "para" | Pausar AirMouse |
-| "continua" / "retoma" | Retomar AirMouse |
+| "pausa" / "para" | Pausar Mãouse |
+| "continua" / "retoma" | Retomar Mãouse |
 | "mais rapido" / "acelera" | Aumentar ganho |
 | "mais devagar" / "desacelera" | Diminuir ganho |
 | "suave" | Preset suave |
@@ -128,7 +128,7 @@ Diga **"Jarvis"** (wake word) seguido de um destes comandos:
 | "lupa" / "zoom" | Ativar lupa |
 | "snap" / "ima" | Toggle snap magnetico |
 | "assistente" | Abrir assistente 3D |
-| "sai" / "termina" | Sair do AirMouse |
+| "sai" / "termina" | Sair do Mãouse |
 
 ### LLM (Ollama)
 

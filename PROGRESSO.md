@@ -1,4 +1,4 @@
-# AirMouse — Estado do Projeto
+# Mãouse — Estado do Projeto
 
 > **Continuar daqui mais tarde.** Este ficheiro guarda tudo o que foi decidido e feito, e o que falta.
 

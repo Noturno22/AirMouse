@@ -1,4 +1,4 @@
-# AirMouse
+# Mãouse
 
 Controla o rato do PC com a mão, via webcam. Sem hardware extra.
 Motor de precisão profissional: filtragem One Euro + curva de aceleração + palm-center estável + emissor a 180 Hz com sub-pixel e predição de movimento.
@@ -61,7 +61,7 @@ badge LUPA quando amplificando, contador de mãos.
 ### Voz profissional (híbrido)
 1. Diz **"Jarvis"** (ou "jarbas") — wake word instantânea (Vosk).
 2. Fala o comando naturalmente — transcrito pelo **Whisper** local (faster-whisper small int8).
-3. O AirMouse responde com **voz neural Piper** (pt_BR; fallback SAPI5 do Windows).
+3. O Mãouse responde com **voz neural Piper** (pt_BR; fallback SAPI5 do Windows).
 
 Comandos naturais: `pausa` · `continua` · `clica` · `clique direito` · `scroll cima/baixo`
 · `abre/fecha o assistente` · `lupa` · `sem lupa` · `ativa/desativa o snap`.
@@ -86,7 +86,7 @@ main.py --tray                   # invisível + ícone na bandeja (usado pelo ar
 
 ### Arranque automático com o Windows
 Faz duplo clique em **`install_startup.bat`** — cria uma tarefa agendada que arranca
-o AirMouse invisível com ícone na bandeja ao iniciar sessão (`uninstall_startup.bat` remove).
+o Mãouse invisível com ícone na bandeja ao iniciar sessão (`uninstall_startup.bat` remove).
 Só corre uma instância (mutex). Ícone da bandeja: pausar, voz on/off, preview, sair.
 
 ### IA de gestos com dados reais (opcional, melhora a precisão)

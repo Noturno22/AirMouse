@@ -216,8 +216,9 @@ institucional ativo, decisão de direção Y2 tomada com dados.
 | 1b | **Paddle checkout** (pagamento automático → emissão de chave + email) | 🔴 Falta integrar webhooks/checkout | Desktop (S2) |
 | 2 | Gate + modal de upgrade | ✅ `ui/license_dlg.py` (upgrade/desativação) | Desktop |
 | 3 | `.exe` polido (assinatura/ícone/versão/console=False) | 🔴 Falta | Desktop (S2) |
-| 4 | Ações nativas Android + AccessibilityService | 🔴 Falta | `mobile/` (S2) |
-| 5 | IAP + store listing mobile | 🔴 Falta | `mobile/` (S2) |
+| 3b | Instalador 1-clique (Inno Setup) | ✅ Feito — `installer.iss` + `dist/Maouse-Setup-1.0.0.exe` (15,6 MB) | Desktop (S1) |
+| 4 | Ações nativas Android + AccessibilityService | 🔴 Falta | `mobile/airmouse-mobile/` (S2) |
+| 5 | IAP + store listing mobile | 🔴 Falta | `mobile/airmouse-mobile/` (S2) |
 | 6 | LAB de hardware a correr / preencher matriz | 🟡 | `HARDWARE/` (S1–S2) |
 
 ### 7.3 Testes de hardware já feitos

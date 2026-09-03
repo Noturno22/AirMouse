@@ -1,4 +1,4 @@
-# Custos de Lançamento — AirMouse (Mãouse)
+# Custos de Lançamento — Mãouse (AirMouse)
 
 > Todos os valores aproximados e em USD/EUR, 2026. Verificar sempre o preço final no
 > site oficial/vendedor no momento da compra. Este documento cobre os custos de
