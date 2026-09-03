@@ -201,12 +201,17 @@ class LicenseManager:
             return False
         if int(time.time()) > int(payload.get("exp", 0)):
             return False
+        # Anti-replay: rejeita apenas leases ESTRITAMENTE mais antigos do que o
+        # último já visto. O lease atual (use_seq/revocation_nonce iguais aos
+        # últimos vistos) tem de continuar válido ao revalidar/reabrir (senão um
+        # lease gravado nunca carregaria e `is_blocked()` bloquearia um PRO bom).
         if int(payload.get("revocation_nonce", -1)) < self._last_nonce:
             return False
-        if int(payload.get("use_seq", -1)) <= self._last_use_seq:
+        if int(payload.get("use_seq", -1)) < self._last_use_seq:
             return False
-        self._last_nonce = int(payload.get("revocation_nonce", 0))
-        self._last_use_seq = int(payload.get("use_seq", 0))
+        # Avança monotonicamente os contadores (nunca regredem).
+        self._last_nonce = max(self._last_nonce, int(payload.get("revocation_nonce", 0)))
+        self._last_use_seq = max(self._last_use_seq, int(payload.get("use_seq", 0)))
         return True
 
     def is_pro_offline_valid(self) -> bool:
