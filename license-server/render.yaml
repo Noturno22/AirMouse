@@ -29,6 +29,14 @@ services:
         sync: false
       - key: AIRMOUSE_SMTP_FROM
         sync: false
+      # Mobile (IAP Pro) — validação server-side das compras Google Play.
+      # Definição no painel: o JSON da conta de serviço é grande e secreto.
+      - key: AIRMOUSE_MOBILE_PRODUCT_ID
+        value: maouse_mobile_pro
+      - key: AIRMOUSE_GOOGLE_PLAY_CREDENTIALS_JSON
+        sync: false
+      - key: AIRMOUSE_MOBILE_DEV_ALLOW
+        value: "0"
       # Base de dados persistente no disco.
       - key: AIRMOUSE_LS_DB
         value: /data/license.db
