@@ -1,0 +1,39 @@
+# Render Blueprint — implanta o license server da Mãouse a partir deste repo.
+# Uso: liga este repo ao Render (Blueprints) ou usa "New + > Blueprint".
+# Um disco persistente é montado em /data — a base SQLite fica lá.
+services:
+  - type: web
+    name: maouse-license-server
+    runtime: docker
+    repo: https://github.com/Noturno22/AirMouse.git
+    plan: free
+    dockerfilePath: ./license-server/Dockerfile
+    envVars:
+      - key: AIRMOUSE_LS_ADMIN_TOKEN
+        sync: false # define no painel (não versionar)
+      - key: AIRMOUSE_LS_PRIVATE_KEY
+        sync: false
+      - key: AIRMOUSE_LS_PUBLIC_KEY
+        sync: false
+      - key: AIRMOUSE_PADDLE_WEBHOOK_SECRET
+        sync: false
+      - key: AIRMOUSE_SMTP_ENABLED
+        value: "0"
+      - key: AIRMOUSE_SMTP_HOST
+        sync: false
+      - key: AIRMOUSE_SMTP_PORT
+        value: "587"
+      - key: AIRMOUSE_SMTP_USER
+        sync: false
+      - key: AIRMOUSE_SMTP_PASSWORD
+        sync: false
+      - key: AIRMOUSE_SMTP_FROM
+        sync: false
+      # Base de dados persistente no disco.
+      - key: AIRMOUSE_LS_DB
+        value: /data/license.db
+    disk:
+      name: maouse-license-data
+      mountPath: /data
+      sizeGB: 1
+    healthCheckPath: /health

@@ -1,0 +1,26 @@
+# Evita enviar artefactos locais para o contexto de build do Docker.
+.venv
+__pycache__
+*.pyc
+*.pem
+*.db
+tests
+dist
+build
+*.spec
+installer.iss
+models
+core
+ui
+mobile
+BUSSINES
+docs
+HARDWARE
+assets
+tools
+.superpawers
+.github
+.git
+.env
+.env.*
+*.log
