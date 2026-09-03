@@ -15,6 +15,7 @@ import ctypes
 import logging
 import os
 import sys
+import time
 
 import cv2
 
@@ -27,7 +28,6 @@ from core.engine import run_loop
 from core.gesture_ai import GestureAI, ensure_ai_model
 from core.licensing import (
     LicenseManager,
-    Tier,
     entitlements,
     is_pro_locked,
     set_active_license,
@@ -44,7 +44,39 @@ from core.voice import VoiceEngine
 log = get_logger("cli")
 
 
+class _UsageWatchdog:
+    """Reporta o tempo de uso efetivo ao trial enquanto está Free.
+
+    Chama-se `tick()` a cada frame processado. Só quando `is_pro` ou
+    `is_blocked()` reporta; o tempo decorrido é acumulado a partir do último
+    tick. Quando o trial esgota, marca `state["license_blocked"]=True` para o
+    gate de `process_frame` bloquear o movimento.
+    """
+
+    def __init__(self, lic, state):
+        self._lic = lic
+        self._state = state
+        self._t0 = time.time()
+
+    def tick(self):
+        if self._lic.is_pro or self._lic.is_blocked():
+            return
+        now = time.time()
+        delta = int(now - self._t0)
+        self._t0 = now
+        if delta >= 1:
+            self._lic.report_usage(delta)
+            if self._lic.is_blocked():
+                self._state["license_blocked"] = True
+
+
 def parse_args():
+    """Constrói e devolve o parser de argumentos da CLI.
+
+    Devolve o ``ArgumentParser`` (não o resultado do parse) para que os testes
+    possam inspecionar as flags disponíveis sem depender do ``sys.argv`` real.
+    O parsing efetivo acontece em ``main()`` via ``parse_args().parse_args()``.
+    """
     parser = argparse.ArgumentParser(description="AirMouse - controla o rato com a mao")
     parser.add_argument("--camera", type=int, default=None)
     parser.add_argument("--gain", type=float, default=None)
@@ -80,20 +112,14 @@ def parse_args():
         type=str,
         default=None,
         metavar="CHAVE",
-        help="ativa uma licenca Pro offline e sai (MAO-XXXX-...).",
+        help="ativa uma licenca Pro ONLINE e sai (MAO-XXXX-...).",
     )
     parser.add_argument(
         "--deactivate",
         action="store_true",
         help="remove a licenca Pro (volta a Free) e sai.",
     )
-    parser.add_argument(
-        "--dev-pro",
-        action="store_true",
-        help="DEV: desbloqueia todas as funcionalidades Pro SEM chave "
-             "(apenas em desenvolvimento; nunca usar no executável).",
-    )
-    return parser.parse_args()
+    return parser
 
 
 def acquire_single_instance():
@@ -184,25 +210,18 @@ def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, spea
 
 
 def main():
-    args = parse_args()
+    args = parse_args().parse_args()
     setup_logging(level=getattr(logging, args.log_level, logging.INFO))
     cfg = Config()
     cfg.selftest_frames = args.frames
 
-    # Licenciamento: cria o gestor e carrega o estado persistido. O gate
-    # Free/Pro é aplicado APÓS load_settings (ver abaixo).
+    # Licenciamento: o construtor já carrega o estado persistido (load interno).
+    # Ao arrancar, reconcilia o trial com o servidor (fonte de verdade, não
+    # reinicia) e tenta revalidar o lease Pro, tudo best-effort/online.
     lic_ = LicenseManager()
-    lic_.load()
+    lic_.reconcile_trial()
+    lic_.maybe_revalidate()
     cfg.license_tier = lic_.tier.value
-
-    # MODO DEV (apenas desenvolvimento): --dev-pro ou AIRMOUSE_DEV_PRO=1 força
-    # o modo Pro completo SEM precisar de chave. Nunca ativamente num
-    # executável/packaging final — só corre quando o dev o liga explicitamente.
-    dev_pro = args.dev_pro or os.getenv("AIRMOUSE_DEV_PRO") == "1"
-    if dev_pro:
-        lic_.tier = Tier.PRO
-        cfg.license_tier = Tier.PRO.value
-        log.warning("MODO DEV-PRO ATIVO: funcionalidades Pro desbloqueadas sem chave.")
 
     # Ações CLI de licença (retornam imediatamente).
     if args.activate_key:
@@ -330,7 +349,12 @@ def main():
         "button_down": False,
         "pinch_debug": bool(getattr(args, "pinch_debug", False)),
         "dbg_until": 0.0,
+        # Gate de bloqueio (process_frame): set no arranque e atualizado pelo
+        # watchdog de uso enquanto o trial consome tempo.
+        "license_blocked": lic_.is_blocked(),
+        "_license_warned": False,
     }
+    state["_usage_watchdog"] = _UsageWatchdog(lic_, state)
     tray_icon = None
     tray_adapter = None
 

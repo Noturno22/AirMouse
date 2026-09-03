@@ -193,6 +193,12 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
     if frame is None:
         return {"frame": None, "done": False, "to_render": False}
 
+    # Watchdog de uso: reporta tempo de Free ao trial (se presente). Quando o
+    # trial esgota, marca state["license_blocked"]=True -> o gate bloqueia.
+    _wd = state.get("_usage_watchdog")
+    if _wd is not None:
+        _wd.tick()
+
     # Gate de bloqueio total: quando o trial/lease expira, NÃO se move o rato.
     # Lê a flag no state (set no arranque/atualizada pelo watchdog) OU o estado
     # real da licença. Devolve cedo com to_render=False, que as duas UIs
