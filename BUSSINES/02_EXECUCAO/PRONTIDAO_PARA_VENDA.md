@@ -1,4 +1,4 @@
-# Prontidão Técnica para Venda — Mãouse (AirMouse)
+﻿# Prontidão Técnica para Venda — Mãouse (AirMouse)
 
 > Estado real do produto face à primeira venda paga. Resultado de uma auditoria técnica
 > profissional com agentes (revisão read-only, sem modificações de código).
@@ -22,7 +22,7 @@ venda paga:
   server, mas falta o fluxo de pagamento automático (Paddle D2 webhooks).
 - ⚠️ **Higiene de qualidade** (ruff 0 erros + CI GitHub Actions) — **resolvido em 2026-09-02**.
 
-> **Conclusão (atualizado 2026-09-02):** o produto tem licenciamento funcional (trial + chave + lease),
+> **Conclusão (atualizado 2026-09-03):** o produto tem licenciamento funcional (trial + chave + lease),
 > mas **faltam o pagamento automático (Paddle) e os/polir comercial** (assinatura EV, instalador,
 > store). Os bloqueadores abaixo são de **execução comercial**, não de feature nova — devem entrar
 > no `PLANO_DE_EXECUCAO_90_DIAS.md` antes de qualquer feature.
@@ -36,7 +36,7 @@ venda paga:
 | Build `.exe` (PyInstaller) | ✅ | `dist\AirMouse\AirMouse.exe` (15,6 MB) existe; 709 MB com modelos; build smokes sem erros |
 | **Code-signing** | 🔴 | `Get-AuthenticodeSignature` → **NotSigned**; nenhum cert/signtool; SmartScreen/AV garantido |
 | Metadados do `.exe` (versão/empresa/ícone) | 🔴 | `console=True`, `icon=None`, sem VersionInfo → `FileVersion 0.0.0.0`, sem branding |
-| Instalador (1-clique) | 🔴 | Só pasta zipada; sem NSIS/Inno/MSIX/AppX; sem packaging Microsoft Store |
+| Instalador (1-clique) | ✅ | Inno Setup `installer.iss` existe; `dist/Maouse-Setup-1.0.0.exe` (15,6 MB) gerado com sucesso |
 | **Licenciamento/chave/ativação** | ✅ | `core/licensing.py` + `core/license_client.py` + `core/fingerprint.py` + `license-server/` completo (FastAPI+SQLite+ES256) — trial 30min server-authoritative, chaves MAO-, ativação por fingerprint, leases JWT |
 | **Gate Free vs Pro** | ✅ | `core/engine.py:process_frame` bloqueia quando trial/lease expira; `ui/license_dlg.py` para upgrade/desativação |
 | Paddle checkout (pagamento automático) | 🔴 | Fluxo de pagamento Paddle D2 não integrado — o cliente aceita chaves manuais mas não há webhooks/checkout automático |
@@ -49,7 +49,7 @@ venda paga:
 
 | Item | Estado | Detalhe verificado |
 |---|---|---|
-| App Expo SDK 57 + engine | ✅ | `mobile/src` real: gestures, filters (One Euro), hooks, store, App.tsx com frame-processor MediaPipe |
+| App Expo SDK 57 + engine | ✅ | `mobile/airmouse-mobile/src` real: gestures, filters (One Euro), hooks, store, App.tsx com frame-processor MediaPipe |
 | EAS Build config | ✅ | `eas.json` (dev/preview/production) + `submit.production`; projectId configurado |
 | **Ações nativas Android (Touch/Keyboard/System)** | 🔴 | **Não implementadas**; sem `AccessibilityService` no Manifest; `NativeModules.TouchController?.tap()` faz **no-op silencioso** em device real |
 | iOS (modo remoto) | ⚠️ | `TouchController.swift`/`SystemController.swift` são **stubs de API privada** ("may cause App Store rejection"); não funcionais |
