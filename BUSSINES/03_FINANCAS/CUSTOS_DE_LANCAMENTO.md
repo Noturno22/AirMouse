@@ -58,7 +58,24 @@ Recomendado: comprar o domínio da marca (ex. `maouse.pt` / `maouse.app`) ~$12/a
 |---|---|---|
 | Página/landing page (GitHub Pages/Netlify/Vercel free tier) | **$0** | Início |
 | Página/landing page profesional (Vercel Pro / hosting) | $20/ano | Opcional |
+| **License server (Render)** | **$0** (free tier) | Início — ver §3.1 |
 | **Processador de pagamentos / Merchant of Record** | — | Ver abaixo |
+
+### 3.1 License server no Render
+O license server (webhook Paddle → chave → email) está deployado via Dockerfile + blueprint
+(`license-server/Dockerfile` + `license-server/render.yaml`). É este servidor que recebe o
+pagamento e emite a chave `MAO-`.
+
+| Item | Custo | Notas |
+|---|---|---|
+| **Render — free tier (web service)** | **$0** | Arranque; o serviço dorme a ~15 min de inatividade (cold start na primeira chamada) |
+| **Render — instance paid ($7/mês)** | **$84/ano** | Necessário quando houver vendas constantes (free tier dorme e atrasa o webhook) |
+| **Render — disco persistente** (1 GB, 5 GB/mês free) | **$0** (no free) | A base SQLite fica em `/data/license.db`; >5 GB/mês paga |
+| **Domínio custom para o serviço** | ~$0–12/ano | O subdomínio `*.onrender.com` é grátis incluído |
+
+> **Recomendação:** arranca no **free tier ($0)** para validar o fluxo, e passa a instance
+> paga (~$7/mês) quando houver vendas recorrentes — o free tier pausa o serviço após
+> inatividade, o que pode atrasar a entrega da chave em compras esporádicas.
 
 ### Pagamentos — a decisão mais importante do modelo
 O modelo de negócio atual (BUSSINES) usa **Paddle como Merchant of Record** (trata IVA/VAT da UE
@@ -72,6 +89,20 @@ por ti — importante porque vendes para a UE).
 
 > **Recomendação:** **Paddle como MoR** — resolve o IVA da UE sem contabilidade complexa e o teu
 > `core/licensing.py` já tem `PADDLE_PRODUCT_URLS` preparado para isto. Custo inicial $0.
+
+### 3.2 Email transacional (envio da chave por SMTP)
+O webhook envia a chave `MAO-` ao comprador por email (`license-server/emailer.py`, SMTP stdlib).
+Necessita de credenciais de um serviço de email transacional.
+
+| Item | Custo | Notas |
+|---|---|---|
+| **Resend / Postmark / SMTP2GO** (plano grátis, ~100–3000 emails/mês) | **$0** (free tier) | Suficiente para arranque (~vendas/mês baixas) |
+| **Plano pago transacional** | ~$10–20/mês | Quando houver >3k emails/mês |
+| Gmail/SMTP do próprio domínio | $0 | Possível mas pode cair em spam; preferir serviço dedicado |
+
+> **Recomendação:** arranca com um **serviço transacional free tier** (ex. Resend) ligado ao teu
+> domínio `maouse.app` — custo $0 até teres vendas em volume. Configuração no servidor via
+> `AIRMOUSE_SMTP_*` (`.env.example`).
 
 ---
 
@@ -105,10 +136,13 @@ por ti — importante porque vendes para a UE).
 | Assinatura (SSL.com IV ou Certum Individual) | ~$129–139/ano |
 | Domínio (.com ou .pt) | ~$12/ano |
 | Landing (free tier) | $0 |
+| License server (Render free tier) | $0 (→ $84/ano se passar a instance paga) |
+| Email transacional (SMTP free tier) | $0 |
 | Paddle (MoR) | $0 + % por venda |
 | Ícones/marca | $0 |
-| **Total 1º ano** | **~$141–151** |
-| **Total renovação (anos seguintes)** | **~$141–151/ano** |
+| **Total 1º ano (free tier)** | **~$141–151** |
+| **Total com Render pago** | **~$225–235/ano** |
+| **Total renovação (anos seguintes, free tier)** | **~$141–151/ano** |
 
 ### Cenário B — Com empresa registada (nome do estúdio no instalador)
 | Item | Custo |
@@ -116,10 +150,13 @@ por ti — importante porque vendes para a UE).
 | Assinatura (SSL.com OV) | $129 (1º ano; $96.75/ano em contrato 5 anos) |
 | Domínio | ~$12/ano |
 | Landing | $0 |
+| License server (Render free tier) | $0 (→ $84/ano se pago) |
+| Email transacional (SMTP free tier) | $0 |
 | Paddle (MoR) | $0 + % por venda |
 | Ícones/marca | $0 |
-| **Total 1º ano** | **~$141** |
-| **Total 5 anos (se OV multi-ano)** | **~$484 + domínios** (~$97–109/ano) |
+| **Total 1º ano (free tier)** | **~$141** |
+| **Total com Render pago** | **~$225/ano** |
+| **Total 5 anos (se OV multi-ano, free tier)** | **~$484 + domínios** (~$97–109/ano) |
 
 ### Cenário C — Com loja mobile incluída
 - Cenário A/B + **$25 Google Play** (pago 1 vez) e, se iOS, **$99/ano Apple**.
@@ -137,4 +174,4 @@ por ti — importante porque vendes para a UE).
 
 ---
 
-*Documento gerado a partir de pesquisa de preços de fornecedores oficiais (SSL.com, Certum, Sectigo, DigiCert, Paddle) em 2026. Preços podem variar — confirmar no checkout.*
+*Documento gerado a partir de pesquisa de preços de fornecedores oficiais (SSL.com, Certum, Sectigo, DigiCert, Paddle, Render, email transacional) em 2026. Preços podem variar — confirmar no checkout.*
