@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AirMouse Mobile",
-    "slug": "airmouse-mobile",
+    "name": "Mãouse",
+    "slug": "maouse",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,9 +10,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.airmouse.mobile",
       "infoPlist": {
-        "NSCameraUsageDescription": "AirMouse precisa de acesso à câmara para detetar gestos de mão",
-        "NSMicrophoneUsageDescription": "AirMouse precisa de acesso ao microfone para comandos de voz",
-        "NSSiriUsageDescription": "AirMouse pode usar Siri para comandos de voz"
+        "NSCameraUsageDescription": "Mãouse precisa de acesso à câmara para detetar gestos de mão",
+        "NSMicrophoneUsageDescription": "Mãouse precisa de acesso ao microfone para comandos de voz",
+        "NSSiriUsageDescription": "Mãouse pode usar Siri para comandos de voz"
       }
     },
     "android": {
@@ -27,8 +27,6 @@
         "CAMERA",
         "RECORD_AUDIO",
         "VIBRATE",
-        "SYSTEM_ALERT_WINDOW",
-        "WRITE_SETTINGS",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
