@@ -1,8 +1,10 @@
 """FastAPI app for the AirMouse License Server."""
-from fastapi import Depends, FastAPI
+import json
+import os
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-
 from storage import connect, init_db
 
 
@@ -130,6 +132,44 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=403, content={"error": "forbidden"})
         revoke_machine(db, req.machine_id)
         return {"ok": True}
+
+    from emailer import send_key_email
+    from paddle import event_info, verify_signature
+    from storage import connect as storage_connect
+    from storage import init_db, purchase_for_event, record_purchase
+
+    @app.post("/webhooks/paddle")
+    async def paddle_webhook(request: Request):
+        secret = os.getenv("AIRMOUSE_PADDLE_WEBHOOK_SECRET", "")
+        if not secret:
+            return JSONResponse(status_code=503,
+                                content={"error": "paddle_nao_configurado"})
+        raw = (await request.body()).decode("utf-8")
+        sig = request.headers.get("Paddle-Signature", "")
+        if not verify_signature(raw, sig, secret):
+            return JSONResponse(status_code=401, content={"error": "assinatura_invalida"})
+        try:
+            event = json.loads(raw)
+        except ValueError:
+            return JSONResponse(status_code=400, content={"error": "json_invalido"})
+        info = event_info(event)
+        if info is None:
+            # evento irrelevante (ex.: transaction.paid) -> reconhecer, nada a fazer
+            return {"ok": True, "handled": False}
+        # ligação local criada e usada no mesmo thread (async handler)
+        conn = storage_connect()
+        init_db(conn)
+        try:
+            existing = purchase_for_event(conn, info["event_id"])
+            if existing is not None:
+                return {"ok": True, "handled": True, "key": existing["key_hash"]}
+            key = issue_key(conn, info["email"])
+            record_purchase(conn, info["event_id"], info["email"],
+                            key, info["product_id"])
+        finally:
+            conn.close()
+        send_key_email(info["email"], key)
+        return {"ok": True, "handled": True, "key": key, "email": info["email"]}
 
     return app
 

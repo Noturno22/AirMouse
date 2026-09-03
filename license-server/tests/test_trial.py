@@ -4,9 +4,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi.testclient import TestClient
-
 from app import create_app
+from fastapi.testclient import TestClient
 from storage import connect, init_db
 
 
@@ -25,9 +24,11 @@ def test_trial_start_ok():
 def test_trial_start_does_not_reset():
     client = _client()
     client.post("/api/v1/trial/start", json={"machine_id": "M2"})
-    conn = connect(); init_db(conn)
+    conn = connect()
+    init_db(conn)
     conn.execute("UPDATE trial SET used_seconds=1800 WHERE machine_id='M2'")
-    conn.commit(); conn.close()
+    conn.commit()
+    conn.close()
     body = client.post("/api/v1/trial/start", json={"machine_id": "M2"}).json()
     assert body["remaining_seconds"] == 0
 

@@ -46,6 +46,13 @@ def init_db(conn: sqlite3.Connection) -> None:
             k TEXT PRIMARY KEY,
             v TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS purchases (
+            event_id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            key_hash TEXT NOT NULL,
+            product_id TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL
+        );
         """
     )
     cur = conn.execute("SELECT v FROM config WHERE k='revocation_nonce'")
@@ -119,6 +126,29 @@ def bump_revocation_nonce(conn) -> int:
     conn.execute("UPDATE config SET v=? WHERE k='revocation_nonce'", (str(n),))
     conn.commit()
     return n
+
+
+# --- purchases (webhook Paddle, dedup por event_id) ---
+def record_purchase(conn, event_id: str, email: str, key_hash: str,
+                    product_id: str = "") -> bool:
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO purchases(event_id, email, key_hash, product_id, created_at)"
+        " VALUES(?,?,?,?,?)",
+        (event_id, email, key_hash, product_id, int(time.time())))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def purchase_for_event(conn, event_id: str):
+    cur = conn.execute("SELECT * FROM purchases WHERE event_id=?", (event_id,))
+    return cur.fetchone()
+
+
+def email_keys(conn, email: str):
+    """Devolve as chaves (já emitidas) de um email de compra."""
+    rows = conn.execute(
+        "SELECT key_hash FROM purchases WHERE email=?", (email,)).fetchall()
+    return [r["key_hash"] for r in rows]
 
 
 # --- trial (fonte de verdade) ---

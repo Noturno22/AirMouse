@@ -5,11 +5,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import jwt
-from fastapi.testclient import TestClient
-
 from app import create_app
-from security import _private_key_path
 from cryptography.hazmat.primitives import serialization
+from fastapi.testclient import TestClient
+from security import _private_key_path
 
 
 def _client():
