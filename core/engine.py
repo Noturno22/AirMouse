@@ -168,7 +168,7 @@ def make_engine_ctx(cfg, smooth_idx, gesture_ai, tuner, ctx):
         switcher_pick=False,
         glitches=0, last_seq=-1, last_scroll=None, fps=0.0, infer_total=0.0,
         frames_done=0, warmup_left=max(cfg.warmup_frames, 0), started=None,
-        window="AirMouse",
+        window="Mãouse",
         # Com o ecrã espelhado (mirror=True), o lado esquerdo do ecrã corresponde
         # à mão "Right" do MediaPipe (e vice-versa). A mão de comandos é a que o
         # utilizador vê à ESQUERDA; a do cursor a que vê à DIREITA.

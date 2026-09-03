@@ -18,6 +18,6 @@ if errorlevel 1 (
     exit /b 1
 )
 echo.
-echo AirMouse arrancara automaticamente com o Windows (modo invisivel + bandeja).
+echo Mãouse arrancara automaticamente com o Windows (modo invisivel + bandeja).
 echo Para remover: corre uninstall_startup.bat
 pause

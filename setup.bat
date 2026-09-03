@@ -1,5 +1,5 @@
 @echo off
-REM Configura o ambiente do AirMouse (executar apenas uma vez)
+REM Configura o ambiente do Mãouse (executar apenas uma vez)
 cd /d "%~dp0"
 
 if not exist .venv (

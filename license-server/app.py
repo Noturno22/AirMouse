@@ -60,7 +60,7 @@ class RevokeRequest(BaseModel):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="AirMouse License Server")
+    app = FastAPI(title="Mãouse License Server")
 
     @app.on_event("startup")
     def _startup():
