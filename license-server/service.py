@@ -4,7 +4,23 @@ import os
 import secrets
 import time
 
-from storage import insert_key
+from security import decode_jwt, issue_lease
+from storage import (
+    TRIAL_MAX_SECONDS,
+    bind_machine,
+    bump_revocation_nonce,
+    delete_machine,
+    get_last_use_seq,
+    get_revocation_nonce,
+    get_trial,
+    hash_key,
+    insert_key,
+    key_exists,
+    machine_for_key,
+    set_last_use_seq,
+    set_trial_used,
+    touch_last_seen,
+)
 
 _ADMIN_TOKEN = os.getenv("AIRMOUSE_LS_ADMIN_TOKEN", "dev-admin-token")
 _PREFIX = "MAO-"
@@ -25,7 +41,6 @@ def issue_key(conn, email: str) -> str:
     nonce = secrets.token_hex(4).upper()
     body = f"PRO{email_hash}{nonce}"
     key = _format_key(body)
-    from storage import hash_key
     insert_key(conn, hash_key(key), email)
     return key
 
@@ -34,18 +49,8 @@ def authorized(token: str) -> bool:
     return token == _ADMIN_TOKEN
 
 
-import secrets
-
-from security import issue_lease
-from storage import (bind_machine, hash_key, key_exists, machine_for_key)
-
-
 def get_current_nonce_helper(conn) -> int:
-    from storage import get_revocation_nonce
     return get_revocation_nonce(conn)
-
-
-from storage import get_trial, set_trial_used, TRIAL_MAX_SECONDS
 
 
 def trial_remaining(conn, machine_id: str) -> int:
@@ -62,18 +67,13 @@ def trial_report(conn, machine_id: str, used_seconds: int) -> int:
     return trial_remaining(conn, machine_id)
 
 
-from security import decode_jwt, issue_lease
-from storage import (set_last_use_seq, get_last_use_seq, touch_last_seen,
-                     delete_machine, bump_revocation_nonce)
-
-
 def revalidate(conn, machine_id: str, old_lease: str) -> str:
     """Valida o lease antigo (assinatura ES256) e emite um novo (7 dias).
     Não renova leases com nonce obsoleto nem seq repetido. Actualiza last_seen."""
     try:
         claims = decode_jwt(old_lease)
     except Exception:
-        raise ValueError("lease_invalido")
+        raise ValueError("lease_invalido") from None
     if claims["sub"] != f"machine:{machine_id}":
         raise ValueError("maquina_diferente")
     if claims["revocation_nonce"] < get_current_nonce_helper(conn):
