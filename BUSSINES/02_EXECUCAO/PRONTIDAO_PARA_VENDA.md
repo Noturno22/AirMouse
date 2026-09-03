@@ -80,7 +80,7 @@ venda paga:
 
 | # | Bloqueador | Estado | Página do plano |
 |---|---|---|---|
-| 1 | **Assinatura digital do `.exe`** (certificado EV/OV ×PFX). Metadados/ícone/`console=False` e instalador já ✅; `build.bat` + signtool prontos a assinar automaticamente quando o cert existir | 🔴 Falta o certificado (passo comercial/PKI) | S2 |
+| 1 | **Assinatura digital do `.exe`** (certificado **OV é suficiente desde 2026** — EV já não salta o SmartScreen automaticamente; EV só p/ drivers de kernel). Metadados/ícone/`console=False` e instalador já ✅; `build.bat` + signtool assinam automaticamente quando existir o `.pfx` em `cert\maouse.pfx` — ver guia `docs/ASSINATURA_DIGITAL.md` | 🔴 Falta o certificado (passo comercial/PKI) | S2 |
 | 2 | **Store listing mobile** (posicionamento acessibilidade + privacy policy + icons Mãouse + upload Play Console do código com IAP) | 🔴 Falta (o **code-side IAP já está ✅**: expo-iap + validação Google no license-server + paywall Pro) | S2 |
 | 3 | **LAB de compatibilidade** (mover o gargalo de hardware para `HARDWARE/`): matriz Validado/Aceite/Não-validado preenchida em ≥5 devices por categoria crítica — evita prometer universalidade e **previne reembolsos (D7)** | 🟡 Em recolha (diretriz: ≥ i3 4ª geração) | S1–S2 |
 
