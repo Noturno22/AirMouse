@@ -43,7 +43,7 @@ def _chain(base, ang0, lengths, curls, max_angles, fold_gain=0.22):
     z = 0.0
     ang = ang0
     pts.append(np.array([p[0], p[1], z]))
-    for L, amax, c in zip(lengths, max_angles, curls):
+    for L, amax, c in zip(lengths, max_angles, curls, strict=True):
         ang += float(c) * amax
         # z: dedos dobrados aproximam-se da câmara (negativo resp. ao pulso).
         # Só acumula com a dobragem (c) — dedo esticado mantém z ~ 0.
@@ -275,7 +275,7 @@ def load_real(path, min_per_class=30):
     if (counts < min_per_class).any():
         raise ValueError(
             "dados reais insuficientes por classe "
-            f"{dict(zip(LABEL_NAMES, counts.tolist()))}; "
+            f"{dict(zip(LABEL_NAMES, counts.tolist(), strict=True))}; "
             f"minimo {min_per_class} por classe. Usa tools/collect_gestures.py"
         )
     return X, y
@@ -361,7 +361,7 @@ def train(per_class=6000, epochs=24, real_path=None, out_dir=None, real_copies=4
         per_class = min(per_class, 3000)
         print(
             "dados reais: "
-            f"{dict(zip(LABEL_NAMES, np.bincount(Yr, minlength=N_CLASSES).tolist()))}"
+            f"{dict(zip(LABEL_NAMES, np.bincount(Yr, minlength=N_CLASSES).tolist(), strict=True))}"
         )
 
     print("A gerar dados sinteticos ...")
@@ -430,7 +430,7 @@ def train(per_class=6000, epochs=24, real_path=None, out_dir=None, real_copies=4
             grads[3] = dh2.sum(0)
             grads[4] = h2.T @ dlogits
             grads[5] = dlogits.sum(0)
-            for pi, (p, g) in enumerate(zip(params, grads)):
+            for pi, (p, g) in enumerate(zip(params, grads, strict=True)):
                 m[pi] = beta1 * m[pi] + (1 - beta1) * g
                 v[pi] = beta2 * v[pi] + (1 - beta2) * g * g
                 mh = m[pi] / (1 - beta1**step)
@@ -452,7 +452,7 @@ def train(per_class=6000, epochs=24, real_path=None, out_dir=None, real_copies=4
     acc = (pred_v == Yva).mean()
     n = N_CLASSES
     conf = np.zeros((n, n), dtype=int)
-    for y, p in zip(Yva, pred_v):
+    for y, p in zip(Yva, pred_v, strict=True):
         conf[y, p] += 1
     print("\nMatriz de confusao SINTETICA (linhas=real, colunas=pred):")
     print("      " + " ".join(f"{nm:>9}" for nm in LABEL_NAMES))
@@ -468,7 +468,7 @@ def train(per_class=6000, epochs=24, real_path=None, out_dir=None, real_copies=4
         pred_r = Pr.argmax(1)
         real_acc = (pred_r == real_va_y).mean()
         conf_r = np.zeros((n, n), dtype=int)
-        for y, p in zip(real_va_y, pred_r):
+        for y, p in zip(real_va_y, pred_r, strict=True):
             conf_r[y, p] += 1
         print("\nMatriz de confusao REAL (linhas=real, colunas=pred):")
         print("      " + " ".join(f"{nm:>9}" for nm in LABEL_NAMES))
@@ -518,7 +518,10 @@ if __name__ == "__main__":
     p.add_argument("--real", default=None, help="npz do collect_gestures.py")
     p.add_argument("--per-class", type=int, default=6000, help="amostras sinteticas/classe")
     p.add_argument("--epochs", type=int, default=24)
-    p.add_argument("--real-copies", type=int, default=4, help="variantes com ruido por amostra real")
+    p.add_argument(
+        "--real-copies", type=int, default=4,
+        help="variantes com ruido por amostra real",
+    )
     p.add_argument("--out", default=None, help="pasta destino do modelo (default models/)")
     a = p.parse_args()
     train(

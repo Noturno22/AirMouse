@@ -4,9 +4,9 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from config import Config
-from core.gestures import Gesture
-from core.twohand import LeftHandDetector
+from config import Config  # noqa: E402
+from core.gestures import Gesture  # noqa: E402
+from core.twohand import LeftHandDetector  # noqa: E402
 
 passed, failed = 0, 0
 
@@ -58,14 +58,22 @@ scroll_up = [(200.0, 300.0), (200.0, 280.0), (200.0, 250.0),
              (200.0, 210.0), (200.0, 170.0), (200.0, 130.0)]
 evs = feed(der, scroll_up)
 scrolls = [v for e, v in evs if e == "scroll"]
-check("deslizar p/ cima -> scroll positivo", len(scrolls) >= 1 and all(v > 0 for v in scrolls), str(evs))
+check(
+    "deslizar p/ cima -> scroll positivo",
+    len(scrolls) >= 1 and all(v > 0 for v in scrolls),
+    str(evs),
+)
 
 der = LeftHandDetector(cfg)
 scroll_down = [(200.0, 130.0), (200.0, 170.0), (200.0, 210.0),
                (200.0, 250.0), (200.0, 290.0), (200.0, 330.0)]
 evs = feed(der, scroll_down)
 scrolls = [v for e, v in evs if e == "scroll"]
-check("deslizar p/ baixo -> scroll negativo", len(scrolls) >= 1 and all(v < 0 for v in scrolls), str(evs))
+check(
+    "deslizar p/ baixo -> scroll negativo",
+    len(scrolls) >= 1 and all(v < 0 for v in scrolls),
+    str(evs),
+)
 
 # 4. Mao esquerda ausente -> reset, nada emite
 der = LeftHandDetector(cfg)
@@ -102,12 +110,15 @@ check("swipe rapido dispara alt_tab_forward", ("alt_tab_forward", None) in evs, 
 der = LeftHandDetector(cfg)
 now = 0.0
 for _ in range(20):  # segurar OPEN 1.0s
-    der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+    der.update((200.0, 200.0), now, Gesture.OPEN)
+    now += 0.05
 for _ in range(2):   # drop 0.1s (< grace 0.3)
-    der.update(None, now); now += 0.05
+    der.update(None, now)
+    now += 0.05
 fired = False
 for _ in range(24):  # segurar mais 1.2s -> total 2.2s continuo
-    ev, _ = der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+    ev, _ = der.update((200.0, 200.0), now, Gesture.OPEN)
+    now += 0.05
     if ev == "alt_switch_open":
         fired = True
 check("drop curto nao reinicia hold", fired, "")
@@ -116,12 +127,15 @@ check("drop curto nao reinicia hold", fired, "")
 der = LeftHandDetector(cfg)
 now = 0.05
 for _ in range(20):  # segurar OPEN 1.0s
-    der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+    der.update((200.0, 200.0), now, Gesture.OPEN)
+    now += 0.05
 for _ in range(9):   # drop 0.45s (> grace 0.3) -> reset
-    der.update(None, now); now += 0.05
+    der.update(None, now)
+    now += 0.05
 fired = False
 for _ in range(20):  # so 1.0s apos reset, insuficiente para 2.0s
-    ev, _ = der.update((200.0, 200.0), now, Gesture.OPEN); now += 0.05
+    ev, _ = der.update((200.0, 200.0), now, Gesture.OPEN)
+    now += 0.05
     if ev == "alt_switch_open":
         fired = True
 check("drop longo reinicia hold", not fired, "")
@@ -265,7 +279,11 @@ for g in (Gesture.PEACE, Gesture.PEACE, Gesture.PEACE):
     ev, val = free.update((200.0, 200.0), now, g)
     if ev is not None:
         evs.append(ev)
-check("FREE: PEACE mao esquerda -> gui_toggle", ("gui_toggle", None) in evs or "gui_toggle" in evs, str(evs))
+check(
+    "FREE: PEACE mao esquerda -> gui_toggle",
+    ("gui_toggle", None) in evs or "gui_toggle" in evs,
+    str(evs),
+)
 
 # 14. O swipe NAO dispara no Free (comandos desligados)
 free2 = LeftHandDetector(cfg, allow_commands=False)
@@ -292,11 +310,12 @@ evs = feed(free4, [(100.0, 100.0), (100.0, 120.0), (100.0, 140.0),
 check("FREE: scroll nao dispara", not any(e == "scroll" for e, _ in evs), str(evs))
 
 # ── Fix espacial: a mao de comandos é a mais à esquerda do ecra ─────────
-from core.engine import _command_hand_frame
-
 # _command_hand_frame recebe dict {label: (HandFrame, event, value)}. HandFrame
 # precisa de palm_center; criamos objetos mínimos via types.SimpleNamespace.
 import types  # noqa: E402
+
+from core.engine import _command_hand_frame  # noqa: E402
+
 
 def mk_frame(x, y):
     return types.SimpleNamespace(palm_center=(x, y))

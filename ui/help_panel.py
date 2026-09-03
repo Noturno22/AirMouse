@@ -126,9 +126,9 @@ class HelpPanel(QWidget):
             f"QScrollArea {{ background: transparent; border: none; }}"
             f"QScrollArea > QWidget > QWidget {{ background: {HELP_BG_SOLID}; }}"
             f"QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}"
-            f"QScrollBar::handle:vertical {{ background: #3A3A5A; border-radius: 4px; min-height: 24px; }}"
+            f"QScrollBar::handle:vertical {{ background: #3A3A5A; border-radius: 4px; min-height: 24px; }}"  # noqa: E501
             f"QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0px; }}"
-            f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}"
+            f"QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}"  # noqa: E501
         )
 
         self._body = None
@@ -191,7 +191,7 @@ class HelpPanel(QWidget):
         lay.addSpacing(3)
         for combo, ak in KB_SHORTCUTS:
             row = QLabel(
-                f'<span style="color:{ACCENT.name()};font-family:\'Consolas\';font-weight:bold;">{combo}</span>'
+                f'<span style="color:{ACCENT.name()};font-family:\'Consolas\';font-weight:bold;">{combo}</span>'  # noqa: E501
                 f'   {_val(ak)}'
             )
             row.setObjectName("HelpRow")

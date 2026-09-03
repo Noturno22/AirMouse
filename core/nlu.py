@@ -30,24 +30,40 @@ ACTIONS = (
 _PATTERNS = (
     ("right_click", (r"clique?\s+direito", r"clica?\s+direito", r"botao\s+direito")),
     ("left_click", (r"\bclique?s?\b", r"\bcarrega\b", r"\btoca\b")),
-    ("magnify_off", (r"(tira|desativa|deslig(a|ar)|cancela)\w*\s*(a\s+)?(amplia\w*|lupa|zoom)", r"menos\s+amplia\w*", r"^sem\s+lupa$")),
+    ("magnify_off", (
+        r"(tira|desativa|deslig(a|ar)|cancela)\w*\s*(a\s+)?(amplia\w*|lupa|zoom)",
+        r"menos\s+amplia\w*",
+        r"^sem\s+lupa$",
+    )),
     ("magnify_on", (r"\bamplia(r|cao|ção)?\b", r"\blupa\b", r"\bzoom\b")),
     ("assistant_close", (r"(fech(a|ar)|sa(i|r))\s+(o\s+)?(assistente|mesa|barehands)",)),
-    ("assistant", (r"\bassistente\b", r"\bbarehands\b", r"\bmesa\s+3d\b", r"abr(e|ir)\s+(o\s+)?jarvis\s*3d")),
+    ("assistant", (
+        r"\bassistente\b", r"\bbarehands\b", r"\bmesa\s+3d\b",
+        r"abr(e|ir)\s+(o\s+)?jarvis\s*3d",
+    )),
     ("snap_toggle", (r"\bsnap\b", r"\bmagnet\w*\b", r"\bima(n|)\b")),
     ("scroll_up", (r"scroll\s+\w*\s*(cima|acima|sobe)", r"(sobe|cima)\s+\w*\s*scroll", r"^sobe$")),
     ("scroll_down", (r"scroll\s+\w*\s*(baixo|desce)", r"(desce|baixo)\s+\w*\s*scroll", r"^desce$")),
     ("pause", (r"\bpaus(a|ar)\b", r"\bcongela\b", r"\bparalisa\b", r"^para$", r"\bparar\b")),
     ("resume", (r"\bcontinu(a|ar)\b", r"\bretom(a|ar)\b", r"\bvolta\b", r"\bsegue\b")),
-    ("gain_up", (r"mais\s+rapido", r"\bacelera\w*", r"aumenta\s+(o\s+)?(cursor|velocidade|rapidez)")),
-    ("gain_down", (r"mais\s+(devagar|lento)", r"\bdesacelera\w*", r"baixa\s+(a\s+)?(velocidade|rapidez)")),
+    ("gain_up", (
+        r"mais\s+rapido", r"\bacelera\w*",
+        r"aumenta\s+(o\s+)?(cursor|velocidade|rapidez)",
+    )),
+    ("gain_down", (
+        r"mais\s+(devagar|lento)", r"\bdesacelera\w*",
+        r"baixa\s+(a\s+)?(velocidade|rapidez)",
+    )),
     ("smooth_reactivo", (r"\breactiv\w+\b", r"\breativ\w+\b")),
     ("smooth_suave", (r"\bsuav\w+\b",)),
     ("smooth_normal", (r"\bnormal\b", r"\bmedio\b")),
     ("autotune_toggle", (r"auto\s*-?\s*(afin\w*|tune|ajuste)",)),
     ("save", (r"\bgrav(a|ar)\b", r"\bguard(a|ar)\b", r"\bsalva(r)?\b")),
     ("help", (r"\bajuda\b", r"\bcomandos\b", r"\bsocorro\b")),
-    ("exit", (r"\bsai(r)?\b", r"\btermin(a|ar)\b", r"\bfech(a|ar)\b", r"\bdesliga(r)?\b", r"\baborta\b")),
+    ("exit", (
+        r"\bsai(r)?\b", r"\btermin(a|ar)\b", r"\bfech(a|ar)\b",
+        r"\bdesliga(r)?\b", r"\baborta\b",
+    )),
 )
 
 _FUZZY_KEYWORDS = {

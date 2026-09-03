@@ -8,8 +8,8 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from core.gesture_ai import CLASSES, N_CLASSES, GestureAI
-from tools.train_gesture_ai import (
+from core.gesture_ai import CLASSES, N_CLASSES, GestureAI  # noqa: E402
+from tools.train_gesture_ai import (  # noqa: E402
     _to_feature,
     load_real,
     split_real,
@@ -33,7 +33,7 @@ try:
     # --- dados "reais" falsos: esqueletos sinteticos em pixels (3D) ---
     xs, ys = [], []
     for cid, g in enumerate(CLASSES):
-        for i in range(60):
+        for _i in range(60):
             skel = synthesize(g, rng)
             origin = rng.uniform(200, 400, 2)
             pts = np.empty_like(skel)

@@ -154,7 +154,7 @@ class LicenseDialog(QDialog):
             w = self._cards_grid.itemAt(i).widget()
             if isinstance(w, _ProductCard):
                 w.set_selected(w._plan_id == plan_id)
-        for plan_id2, name, price, extra, _ in _PRODUCTS:
+        for plan_id2, _name, price, _extra, _ in _PRODUCTS:
             if plan_id2 == plan_id:
                 self._cta.setText(f"⭐  {tr('license.cta')} · {price}")
                 break

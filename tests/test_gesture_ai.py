@@ -1,7 +1,5 @@
-import numpy as np
-import os
-import tempfile
 
+import numpy as np
 import pytest
 
 from core.gesture_ai import CLASSES, FEATURES, N_CLASSES, GestureAI, _normalize

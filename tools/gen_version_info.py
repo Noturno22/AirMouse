@@ -1,10 +1,7 @@
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import appinfo as ai
 
 from PyInstaller.utils.win32.versioninfo import (
     FixedFileInfo,
@@ -15,6 +12,8 @@ from PyInstaller.utils.win32.versioninfo import (
     VarStruct,
     VSVersionInfo,
 )
+
+import appinfo as ai
 
 VER = tuple(int(x) for x in ai.APP_VERSION.split(".")) + (0,)
 

@@ -58,7 +58,7 @@ class LanguageButton(QPushButton):
         I18N.toggle()
 
     def update_text(self):
-        self.setText((" EN" if I18N.lang == "pt" else " PT"))
+        self.setText(" EN" if I18N.lang == "pt" else " PT")
 
 
 class SectionLabel(QLabel):
@@ -161,7 +161,9 @@ class MenuPanel(QWidget):
         def tick(val):
             self._effect.setOpacity(val)
             m = self._self_layout.contentsMargins()
-            self._self_layout.setContentsMargins(int((1 - val) * 14), m.top(), m.right(), m.bottom())
+            self._self_layout.setContentsMargins(
+                int((1 - val) * 14), m.top(), m.right(), m.bottom()
+            )
 
         self._anim.valueChanged.connect(tick)
         self._anim.start()

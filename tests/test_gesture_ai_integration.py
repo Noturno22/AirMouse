@@ -1,8 +1,6 @@
 import numpy as np
-import pytest
 
 from config import Config
-from core.gesture_ai import _normalize
 from core.gestures import Gesture, GestureEngine
 from tools.train_gesture_ai import synthesize
 
@@ -26,7 +24,7 @@ def test_update_accepts_3d_landmarks():
     eng = _engine()
     skel = synthesize(Gesture.OPEN, np.random.default_rng(2)).astype(float)
     pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
-    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
+    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2], strict=True)]
     for _ in range(5):
         eng.update(lm, 640, 480)
 
@@ -49,7 +47,7 @@ def test_ai_receives_window_of_3d_points():
     eng = GestureEngine(Config(), gesture_ai=SpyAI())
     skel = synthesize(Gesture.OPEN, np.random.default_rng(3)).astype(float)
     pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
-    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
+    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2], strict=True)]
     for _ in range(3):
         eng.update(lm, 640, 480)
     assert captured
@@ -70,7 +68,7 @@ def test_ai_window_capped_by_config():
     eng = GestureEngine(cfg, gesture_ai=SpyAI())
     skel = synthesize(Gesture.OPEN, np.random.default_rng(4)).astype(float)
     pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
-    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
+    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2], strict=True)]
     for _ in range(7):
         eng.update(lm, 640, 480)
     c = np.asarray(captured[-1], dtype=float)
@@ -87,7 +85,7 @@ def test_reset_clears_ai_window():
     eng = GestureEngine(cfg, gesture_ai=SpyAI())
     skel = synthesize(Gesture.OPEN, np.random.default_rng(5)).astype(float)
     pts2 = skel[:, :2] * 150 + np.array([320.0, 240.0])
-    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2])]
+    lm = [(p[0] / 640, p[1] / 480, z) for (p, z) in zip(pts2, skel[:, 2], strict=True)]
     eng.update(lm, 640, 480)
     eng.reset()
     assert len(eng._ai_window) == 0

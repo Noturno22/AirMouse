@@ -19,7 +19,7 @@ def test_guard_against_duplicate_num_hands():
 
 
 def test_presets_reference_real_fields():
-    for name, cut, beta in config.SMOOTH_PRESETS:
+    for _name, cut, beta in config.SMOOTH_PRESETS:
         assert 0.4 <= cut <= 3.0
         assert 0.008 <= beta <= 0.08
 

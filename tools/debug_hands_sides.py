@@ -7,16 +7,15 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from config import Config
-from core.camera import CameraStream
-from core.tracker import HandTracker, ensure_model
-from main import open_camera
+from config import Config  # noqa: E402
+from core.tracker import HandTracker, ensure_model  # noqa: E402
+from main import open_camera  # noqa: E402
 
 cfg = Config()
 print("=== DIAGNÓSTICO HANDEDNESS ===")
 print(f"cfg.mirror       = {cfg.mirror}")
 print(f"cfg.num_hands    = {cfg.num_hands}")
-print(f"command_side     = 'Right' se mirror, 'Left' se not")
+print("command_side     = 'Right' se mirror, 'Left' se not")
 print("(a mão que executa comandos deve bater com o label que o MediaPipe dá)")
 print("-" * 60)
 
@@ -36,8 +35,8 @@ frame_i = 0
 last_seq = -1
 outpath = os.path.join(ROOT, "tools", "sides_debug.txt")
 with open(outpath, "w", encoding="utf-8") as fh:
-    fh.write("cfg.mirror=%s command_side='%s'\n" % (
-        cfg.mirror, "Right" if cfg.mirror else "Left"))
+    side = "Right" if cfg.mirror else "Left"
+    fh.write(f"cfg.mirror={cfg.mirror} command_side='{side}'\n")
     try:
         while time.time() - t0 < 30:
             frame, seq = cam.read()

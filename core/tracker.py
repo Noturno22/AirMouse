@@ -79,7 +79,7 @@ class HandTracker:
         hands = []
         sides = []
         for lm_list, handed in zip(
-            result.hand_landmarks, result.handedness or ()
+            result.hand_landmarks, result.handedness or (), strict=True
         ):
             hands.append([(lm.x, lm.y, lm.z) for lm in lm_list])
             label = "Right"

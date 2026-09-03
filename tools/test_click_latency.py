@@ -22,10 +22,10 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-import config as cfg_mod
-from config import Config
-from core.gestures import Gesture, GestureEngine
-from tools.train_gesture_ai import synthesize
+import config as cfg_mod  # noqa: E402
+from config import Config  # noqa: E402
+from core.gestures import Gesture, GestureEngine  # noqa: E402
+from tools.train_gesture_ai import synthesize  # noqa: E402
 
 W, H = 640, 480
 ORIGIN = np.array([0.55 * W, 0.55 * H])
@@ -155,7 +155,7 @@ check("commit PINCH com IA contraria", committed == Gesture.PINCH, str(committed
 # 7. Pinça de frente para a câmara (z-ruído) continua detetada (min 2D/3D).
 def with_z(skel_px, z_delta, tip_idx=4):
     lm = to_lm(skel_px)
-    return [([l[0], l[1], z_delta if i == tip_idx else 0.0]) for i, l in enumerate(lm)]
+    return [([p[0], p[1], z_delta if i == tip_idx else 0.0]) for i, p in enumerate(lm)]
 
 
 eng = GestureEngine(cfg, FakeAI(Gesture.OPEN, 0.99))

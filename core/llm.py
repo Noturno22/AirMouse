@@ -177,7 +177,7 @@ class ChatClient:
 
     def _classifier_call(self, text, timeout):
         """Devolve o JSON interpretado, ou {} em caso de erro."""
-        for base, model, key, headers, desc in self._classifier_candidates():
+        for base, model, _key, headers, desc in self._classifier_candidates():
             payload = {
                 "model": model,
                 "messages": [
@@ -305,4 +305,7 @@ class ChatClient:
 
         self._state["down_until"] = time.monotonic() + 30.0
         self._state["err"] = str(err)
-        return "Nao consegui ligar a inteligencia agora. Verifica a ligacao a internet ou a chave da API."
+        return (
+            "Nao consegui ligar a inteligencia agora. "
+            "Verifica a ligacao a internet ou a chave da API."
+        )

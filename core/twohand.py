@@ -203,7 +203,7 @@ class HandPool:
         # devia gerar uma segunda entidade (falso "2 maos" no Free, gestos de
         # 2 maos indevidos). Descarta a duplicata quando as palmas coincidem.
         kept = []
-        for hand, side in zip(hands, sides):
+        for hand, side in zip(hands, sides, strict=True):
             cx = self._palm_center(hand)
             if any(abs(kx - cx) < 0.18 for kx, _, _ in kept):
                 continue
@@ -212,7 +212,7 @@ class HandPool:
         # opomos os labels (o MediaPipe desta camara marca ambas "Right").
         results = {}
         seen = set()
-        for i, (cx, side, hand) in enumerate(kept):
+        for _i, (_cx, side, hand) in enumerate(kept):
             label = side if side in self.engines else "Right"
             if label in seen:
                 label = "Left" if label == "Right" else "Right"

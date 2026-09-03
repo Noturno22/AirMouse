@@ -6,9 +6,9 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from config import Config
-from core.gestures import Gesture, GestureEngine
-from tools.train_gesture_ai import synthesize
+from config import Config  # noqa: E402
+from core.gestures import Gesture, GestureEngine  # noqa: E402
+from tools.train_gesture_ai import synthesize  # noqa: E402
 
 W, H = 640, 480
 ORIGIN = np.array([0.55 * W, 0.55 * H])
@@ -208,7 +208,7 @@ check(
 # do MediaPipe): o racio 3D sozinho dispara acima do limiar, mas o minimo(2D,3D) mantem.
 def with_z(skel_px, z_delta, tip_idx=4):
     lm = to_lm(skel_px)
-    return [([l[0], l[1], z_delta if i == tip_idx else 0.0]) for i, l in enumerate(lm)]
+    return [([p[0], p[1], z_delta if i == tip_idx else 0.0]) for i, p in enumerate(lm)]
 
 
 skel_pinch2 = synthesize(Gesture.PINCH, np.random.default_rng(1234)) * PX_SCALE

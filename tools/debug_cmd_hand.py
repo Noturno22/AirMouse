@@ -18,19 +18,19 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-import cv2
+import cv2  # noqa: E402
 
-from config import Config
-from core.engine import _command_hand_frame
-from core.tracker import HandTracker, ensure_model
-from core.twohand import HandPool
-from main import open_camera
+from config import Config  # noqa: E402
+from core.engine import _command_hand_frame  # noqa: E402
+from core.tracker import HandTracker, ensure_model  # noqa: E402
+from core.twohand import HandPool  # noqa: E402
+from main import open_camera  # noqa: E402
 
 cfg = Config()
 cfg.num_hands = 2
 print("=== DIAGNÓSTICO MÃO DE COMANDOS (com espelho) ===")
 print(f"cfg.mirror     = {cfg.mirror}")
-print(f"frame espelhado ANTES do tracking? SIM (igual ao engine)")
+print("frame espelhado ANTES do tracking? SIM (igual ao engine)")
 print("Levanta as DUAS mãos e faz gestos na esquerda. Ctrl+C para sair.")
 print("-" * 64)
 
@@ -76,7 +76,10 @@ with open(outpath, "w", encoding="utf-8") as fh:
                     p = hf.palm_center
                     line_parts.append(f"{side_label}@x={int(p[0]) if p else '?'}")
                 cmd = _command_hand_frame(results, cfg.mirror, w)
-                cmd_txt = f"{cmd[0].gesture.name}@x={int(cmd[0].palm_center[0])}" if cmd else "NENHUMA"
+                cmd_txt = (
+                    f"{cmd[0].gesture.name}@x={int(cmd[0].palm_center[0])}"
+                    if cmd else "NENHUMA"
+                )
                 line_parts.append(f"  COMANDOS-> {cmd_txt}")
                 line = " ".join(line_parts)
                 print(line)

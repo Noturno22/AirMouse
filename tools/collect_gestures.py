@@ -94,7 +94,7 @@ def save(out_path, collector):
         classes=np.array(CLASS_NAMES),
     )
     print(f"Gravado: {out_path} | total {len(xs)} amostras | por classe "
-          f"{dict(zip(CLASS_NAMES, collector.counts()))}")
+          f"{dict(zip(CLASS_NAMES, collector.counts(), strict=False))}")
     return True
 
 
@@ -260,7 +260,10 @@ def parse_args():
         "--frames", type=int, default=0,
         help="modo automatico: captura N amostras do gesto --class e sai",
     )
-    p.add_argument("--class", dest="cls", default=None, help="OPEN|PINCH|PINCH_MID|FIST|PEACE|THREE|THUMB_UP|ROCK|SHAKA")
+    p.add_argument(
+        "--class", dest="cls", default=None,
+        help="OPEN|PINCH|PINCH_MID|FIST|PEACE|THREE|THUMB_UP|ROCK|SHAKA",
+    )
     return p.parse_args()
 
 

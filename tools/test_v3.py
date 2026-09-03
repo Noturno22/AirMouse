@@ -39,7 +39,7 @@ def t_emitter_conservation():
     em = SmoothEmitter(fm, rate_hz=180.0)
     em.start()
     total_x, total_y = 0.0, 0.0
-    for i in range(30):
+    for _i in range(30):
         dx, dy = 10.0, -4.0
         em.push(dx, dy, 0.02)
         total_x += dx
