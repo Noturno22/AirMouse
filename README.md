@@ -174,8 +174,3 @@ airmouse/
 │   └── test_v3.py             ← suíte de testes v3 (17 testes)
 └── models/              ← hand_landmarker.task · gesture_mlp.npz · vosk · piper/
 ```
-
-MAO-PROA9-D6BE9-549FC-AEE5C-C78C4-E4622-4BF56
-
-
-  Continue  opencode -s ses_f9c7d61c2ffelI7ZrKdm7p6Utp
