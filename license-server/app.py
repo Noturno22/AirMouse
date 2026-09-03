@@ -59,6 +59,13 @@ class RevokeRequest(BaseModel):
     admin_token: str
 
 
+class MobileEntitleRequest(BaseModel):
+    purchase_token: str
+    product_id: str
+    package_name: str
+    device_id: str
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="Mãouse License Server")
 
@@ -92,6 +99,24 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=403, content={"error": str(exc)})
         return ActivateResponse(tier="pro", lease=lease,
                                 session_id=session_id, use_seq=use_seq)
+
+    from service import mobile_entitle
+
+    @app.post("/api/v1/mobile/entitle")
+    def api_mobile_entitle(req: MobileEntitleRequest, db=Depends(get_db)):
+        expected_product = os.getenv("AIRMOUSE_MOBILE_PRODUCT_ID",
+                                     "maouse_mobile_pro")
+        from playstore import PlayValidationError, validate_purchase
+        try:
+            lease, session_id, first_time = mobile_entitle(
+                db, req.purchase_token, req.product_id, req.package_name,
+                req.device_id, expected_product, validate_purchase)
+        except ValueError as exc:
+            return JSONResponse(status_code=422, content={"error": str(exc)})
+        except PlayValidationError as exc:
+            return JSONResponse(status_code=403, content={"error": str(exc)})
+        return {"tier": "mobile_pro", "lease": lease,
+                "session_id": session_id, "first_time": first_time}
 
     from service import trial_remaining, trial_report
     from storage import TRIAL_MAX_SECONDS

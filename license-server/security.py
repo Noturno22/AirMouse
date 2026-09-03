@@ -52,12 +52,12 @@ def sign(claims: dict) -> str:
 
 
 def issue_lease(machine_id: str, key_hash: str, revocation_nonce: int,
-                session_id: str, use_seq: int) -> str:
+                session_id: str, use_seq: int, tier: str = "pro") -> str:
     now = int(time.time())
     claims = {
         "sub": f"machine:{machine_id}",
         "key_hash": key_hash,
-        "tier": "pro",
+        "tier": tier,
         "session_id": session_id,
         "use_seq": use_seq,
         "revocation_nonce": revocation_nonce,

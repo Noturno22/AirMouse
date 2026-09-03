@@ -17,6 +17,8 @@ from storage import (
     insert_key,
     key_exists,
     machine_for_key,
+    mobile_purchase_for_token,
+    record_mobile_purchase,
     set_last_use_seq,
     set_trial_used,
     touch_last_seen,
@@ -113,3 +115,41 @@ def activate(conn, key: str, machine_id: str) -> tuple[str, str, int]:
     nonce = get_current_nonce_helper(conn)
     lease = issue_lease(machine_id, key_hash, nonce, session_id, use_seq)
     return lease, session_id, use_seq
+
+
+def mobile_entitle(conn, purchase_token: str, product_id: str,
+                   package_name: str, device_id: str, expected_product: str,
+                   validate) -> tuple[str, str, bool]:
+    """Desbloqueia 'mobile_pro' via uma compra IAP (Google Play). Single purchase.
+
+    - validate(package_name, product_id, purchase_token) levanta
+      PlayValidationError se o token não for válido.
+    - Dedup anti-replay por purchase_token (o mesmo token só gera entitlement
+      uma vez; depois é reaproveitado sem chamar a API do Google).
+    - Devolve (lease, session_id, first_time).
+    """
+    purchase_token = purchase_token.strip()
+    if not purchase_token:
+        raise ValueError("token_vazio")
+    if product_id != expected_product:
+        raise ValueError("produto_errado")
+
+    key_hash = f"MOB:{hash_key(purchase_token)[:16].upper()}"
+    existing = mobile_purchase_for_token(conn, purchase_token)
+    if existing is not None:
+        session_id = secrets.token_hex(16)
+        use_seq = int(time.time() * 1000)
+        nonce = get_current_nonce_helper(conn)
+        lease = issue_lease(device_id, existing["key_hash"], nonce,
+                            session_id, use_seq, tier="mobile_pro")
+        return lease, session_id, False
+
+    validate(package_name, product_id, purchase_token)
+    record_mobile_purchase(conn, purchase_token, package_name,
+                           product_id, device_id, key_hash)
+    session_id = secrets.token_hex(16)
+    use_seq = int(time.time() * 1000)
+    nonce = get_current_nonce_helper(conn)
+    lease = issue_lease(device_id, key_hash, nonce, session_id, use_seq,
+                        tier="mobile_pro")
+    return lease, session_id, True

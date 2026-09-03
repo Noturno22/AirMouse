@@ -53,6 +53,14 @@ def init_db(conn: sqlite3.Connection) -> None:
             product_id TEXT NOT NULL DEFAULT '',
             created_at INTEGER NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS mobile_purchases (
+            purchase_token TEXT PRIMARY KEY,
+            package_name TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            device_id TEXT NOT NULL DEFAULT '',
+            key_hash TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+        );
         """
     )
     cur = conn.execute("SELECT v FROM config WHERE k='revocation_nonce'")
@@ -149,6 +157,25 @@ def email_keys(conn, email: str):
     rows = conn.execute(
         "SELECT key_hash FROM purchases WHERE email=?", (email,)).fetchall()
     return [r["key_hash"] for r in rows]
+
+
+# --- mobile purchases (IAP Play, dedup por purchase_token) ---
+def record_mobile_purchase(conn, purchase_token: str, package_name: str,
+                           product_id: str, device_id: str, key_hash: str) -> bool:
+    cur = conn.execute(
+        "INSERT OR IGNORE INTO mobile_purchases("
+        " purchase_token, package_name, product_id, device_id, key_hash, created_at)"
+        " VALUES(?,?,?,?,?,?)",
+        (purchase_token, package_name, product_id, device_id, key_hash,
+         int(time.time())))
+    conn.commit()
+    return cur.rowcount > 0
+
+
+def mobile_purchase_for_token(conn, purchase_token: str):
+    cur = conn.execute(
+        "SELECT * FROM mobile_purchases WHERE purchase_token=?", (purchase_token,))
+    return cur.fetchone()
 
 
 # --- trial (fonte de verdade) ---

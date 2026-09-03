@@ -9,6 +9,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.airmouse.mobile",
+      "deploymentTarget": "15.0",
       "infoPlist": {
         "NSCameraUsageDescription": "Mãouse precisa de acesso à câmara para detetar gestos de mão",
         "NSMicrophoneUsageDescription": "Mãouse precisa de acesso ao microfone para comandos de voz",
@@ -53,12 +54,19 @@
         {
           "addGeneratedScheme": false
         }
+      ],
+      [
+        "expo-iap",
+        {}
       ]
     ],
     "extra": {
       "eas": {
         "projectId": "8854f8b4-5ff4-4b8f-8279-6df948fbf502"
-      }
+      },
+      "licenseServerUrl": "https://license.maouse.app",
+      "mobileProductId": "maouse_mobile_pro",
+      "androidPackage": "com.airmouse.mobile"
     }
   }
 }
