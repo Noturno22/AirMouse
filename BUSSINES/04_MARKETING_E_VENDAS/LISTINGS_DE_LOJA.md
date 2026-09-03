@@ -3,7 +3,7 @@
 > Descrições prontas a colar nas lojas, em **PT-BR + EN**, posicionadas como acessibilidade
 > primeiro (segmento nº1). Cumprem as regras do `ANTIPADROES_E_RISCOS.md` (nunca prometer
 > universalidade), D4 (línguas), D6 (privacidade) e o posicionamento de acessibilidade do plano.
-> **Data:** 2026-09-02 · Autor: Luar Studio Angola · Estado: pronto a adaptar à submissão final.
+> **Data:** 2026-09-03 (atualizado) · Autor: Luar Studio Angola · Estado: **pronto a adaptar à submissão final** (IAP mobile Pro já implementado em código — ver §8).
 
 ---
 
@@ -247,7 +247,7 @@ An access and ergonomics tool; not a medical device and does not treat any condi
 | Campo | Valor |
 |---|---|
 | **Categoria** | Utilitários → Utilitários de sistema / Acessibilidade |
-| **Preço base** | Free + IAP/compra in-app "Mãouse Pro" (meios de cobrança MS) |
+| **Preço base** | Free (navega/pré-visualiza) + **IAP pago único "Mãouse Pro"** — `maouse_mobile_pro` desbloqueia gestos completos (validação server-side no license-server) |
 | **Traços** | Windows 10/11; desktop; webcam necessária |
 | **Keywords** | gesture; mouse; accessibility; air mouse; voice; RSI; presentation; hands free |
 | **Idiomas** | pt-BR, en-US |
@@ -300,7 +300,7 @@ An access and ergonomics tool; not a medical device and does not treat any condi
 - [ ] Vídeo de marketing anexado (Play) / opcional (MS)
 - [ ] Idade 3+ e conteúdo seguro para todas as audiências
 - [ ] Regional pricing EUR (e R$ / Kz em PT-BR/AO conforme roadmap)
-- [ ] IAP "Mãouse Pro" configurado com produto/IDs (Play Billing) + restore
+- [x] IAP "Mãouse Pro" configurado com produto/IDs (Play Billing) + restore — **code pronto 2026-09-03** (`maouse_mobile_pro`, pago único, validação server-side no license-server); falta prebuild/upload com o produto criado no Play Console
 - [ ] Reembolso em conformidade D7 (as lojas gerem refunds de IAP de acordo com políticas delas)
 - [ ] Contacto de suporte ativo (suporte@maouse.app) antes da submissão
 

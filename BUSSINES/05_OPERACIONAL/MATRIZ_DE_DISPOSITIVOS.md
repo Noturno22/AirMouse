@@ -78,9 +78,10 @@
 
 ## 6. Síntese (atualizar após cada 10 testes)
 
-> *Atualizado 2026-09-01 — primeiro dispositivo testado (HP Notebook i3-5005U). Ainda muito
+> *Atualizado 2026-09-03 — primeiro dispositivo testado (HP Notebook i3-5005U). Ainda muito
 > longe do "go" institucional (≥5 ✅ por categoria). Contar ⚠️ "Bloqueado" e ❌ "Não-validado"
-> como não comercializáveis.*
+> como não comercializáveis. Em paralelo: **IAP mobile Pro implementado em código (2026-09-03)**
+> — falta testar em hardware real low-end para alimentar esta matriz.*
 
 | Categoria | # Validado | # Aceite | # Não-validado | # Bloqueado | Cobertura p/ institucional? |
 |---|---|---|---|---|---|
@@ -109,7 +110,7 @@ técnico validado num parque real.
 | Decisão comercial | Estado | Base na matriz |
 |---|---|---|
 | 🟢 **Consumer desktop** (Pro €39,90) | **PODE vender** — sem reembolso em aberto | Funciona num desktop fraco |
-| 🟢 **Consumer mobile** (IAP) | **PODE** beta/soft-launch | Aviso de performance; nada valida em low-end ainda |
+| 🟢 **Consumer mobile** (IAP) | **PODE** beta/soft-launch — **IAP Pro code pronto** (expo-iap + validação Google no license-server + paywall) | Aviso de performance; nada valida em low-end ainda — **testar em 5+ telemóveis** |
 | 🟡 **Piloto institucional TÉCNICO** (2–4 semanas no parque) | **PODE oferecer** — é exatamente o que falta | Usa o parque real do cliente como validação |
 | 🔴 **Contrato institucional ANUAL** (€5–50k) | **NÃO pode assinar ainda** | Só 0-1 🟡 por categoria; <5 ✅; sem parque validado |
 | ⚠️ **OEM/white-label** | **NÃO** | Requer prova de escala e parque estável |
