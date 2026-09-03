@@ -415,7 +415,7 @@ const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
     return (
       <View style={styles.permissionContainer}>
         <Text style={styles.permissionText}>
-          AirMouse precisa de acesso à câmara para detetar gestos de mão
+          Mãouse precisa de acesso à câmara para detetar gestos de mão
         </Text>
         <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
           <Text style={styles.permissionButtonText}>Permitir Câmara</Text>

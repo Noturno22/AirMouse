@@ -1,4 +1,4 @@
-# AirMouse Mobile
+# Mãouse — Mobile
 
 Controle total do telemóvel usando gestos de mão detetados pela câmara frontal.
 

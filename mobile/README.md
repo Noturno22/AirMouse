@@ -1,8 +1,8 @@
-# AirMouse Mobile - Guia Completo
+# Mãouse Mobile - Guia Completo
 
 ## Visão Geral
 
-**AirMouse Mobile** é um aplicativo React Native/Expo que permite controlar o telemóvel total usando gestos de mão detetados pela câmara frontal do dispositivo.
+**Mãouse Mobile** é um aplicativo React Native/Expo que permite controlar o telemóvel total usando gestos de mão detetados pela câmara frontal do dispositivo.
 
 ---
 
@@ -168,7 +168,7 @@ npx expo run:ios
 
 > **Android requer o serviço de acessibilidade ativo** (para simular toques/gestos
 > em outras apps sem root). Ativar em:
-> `Definições > Acessibilidade > AirMouse`. Sem o serviço, os módulos não têm efeito.
+> `Definições > Acessibilidade > Mãouse`. Sem o serviço, os módulos não têm efeito.
 
 > **Nota iOS:** tap/gestos em outras apps exigem APIs privadas — a implementação atual
 > é um esboço funcional (clipboard + Accessibility), não garantida em todas as versões.
@@ -350,7 +350,7 @@ npx expo prebuild --clean
 ```
 
 ### Gestos não têm efeito no Android
-Ativar o serviço de acessibilidade: `Definições > Acessibilidade > AirMouse`.
+Ativar o serviço de acessibilidade: `Definições > Acessibilidade > Mãouse`.
 Sem isto, `TouchController`/`SystemController`/`KeyboardController` não conseguem
 injetar ação noutras apps (o Android exige o serviço para gestos globais sem root).
 

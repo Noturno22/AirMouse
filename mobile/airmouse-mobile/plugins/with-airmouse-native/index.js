@@ -149,10 +149,10 @@ function withAirMouseStrings(config) {
       if (strings.some((s) => s["$"] && s["$"].name === name)) return;
       strings.push({ $: { name }, _: value });
     };
-    add("accessibility_service_label", "AirMouse");
+    add("accessibility_service_label", "Mãouse");
     add(
       "accessibility_service_description",
-      "Usa gestos de mão detetados pela câmara para controlar o telemóvel: toques, arrastar, voltar, início e notificações. Ativa para que o AirMouse consiga interagir com outras apps."
+      "Usa gestos de mão detetados pela câmara para controlar o telemóvel: toques, arrastar, voltar, início e notificações. Ativa para que o Mãouse consiga interagir com outras apps."
     );
     mod.modResults.resources.string = strings;
     return mod;
