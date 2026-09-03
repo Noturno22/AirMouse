@@ -31,5 +31,16 @@ Desktop.ini
 
 # Secrets
 .env
+.env.*
+!.env.example
+*.pfx
+*.p12
+license-server/*.pem
+license-server/private.pem
+license-server/private_key.pem
+license-server/*.db
+license_server.db
+!license-server/keys.py
+
 # Gerado pelo build
 version_info.txt

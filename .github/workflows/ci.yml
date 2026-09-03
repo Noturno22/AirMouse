@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-build.txt -r license-server/requirements.txt ruff
+
+      - name: Lint (ruff)
+        run: ruff check . --exclude .venv
+
+      - name: Test (client)
+        run: pytest tests -q
+
+      - name: Test (license server)
+        run: pytest license-server/tests -q
