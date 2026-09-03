@@ -12,7 +12,6 @@ import {
 import { Camera, useCameraDevice, useFrameProcessor, useCameraPermission, VisionCameraProxy } from 'react-native-vision-camera';
 import { Worklets } from 'react-native-worklets-core';
 import type { HandDetectionResult } from 'expo-vision-camera-v4-mediapipe';
-import { useGestures } from './src/hooks/useGestures';
 import { useSettingsStore, useGestureStore } from './src/store';
 import { GESTURE_LABELS, GESTURE_COLORS, HAND_CONNECTIONS } from './src/constants';
 import { GestureType, HandLandmarks } from './src/types/gesture';

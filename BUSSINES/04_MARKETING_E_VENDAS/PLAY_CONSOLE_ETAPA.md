@@ -14,13 +14,37 @@ O código do **paywall Pro / IAP** (Play Billing) **já está implementado** e v
 - ✅ TypeScript typecheck passa · ✅ testes server + client passam
 
 **MAS a app ainda NÃO está funcional** — o utilizador relatou que o mobile **não deteta nenhum
-gesto ainda**. O reconhecimento de gestos (frame processor / MediaPipe) não está a funcionar de
-forma fiável no dispositivo. **Sem gestos a funcionar, não há produto para submeter à Play Store** —
-a Conta Play Console é útil **só depois** de o reconhecimento de gestos estar a funcionar.
+gesto ainda**. **Sem gestos a funcionar, não há produto para submeter à Play Store** — a Conta
+Play Console é útil **só depois** de o reconhecimento de gestos estar a funcionar.
 
 > **Conclusão:** a Play Console não é o próximo passo. O próximo passo é **fazer o mobile detetar
 > gestos** (debug do frame processor e do modelo MediaPipe no dispositivo). Só depois de a app
 > funcionar é que faz sentido pagar e criar a conta Play Console.
+
+### ✔ Validação estática feita (2026-09-03) — o que encontrei e corrigi
+
+Auditei o pipeline de deteção de gestos (nativo + JS). **O wiring nativo está correto**:
+- `MainApplication.kt` regista o plugin `handLandmarker` via `FrameProcessorPluginRegistry`
+  (nome bate certo com o `initFrameProcessorPlugin('handLandmarker')` do `App.tsx`).
+- Asset `hand_landmarker.task` presente em `android/app/src/main/assets`.
+- Versões compatíveis: `react-native-vision-camera@4.7.3` + `react-native-worklets-core@1.6.3`.
+
+**Corrições aplicadas (code, $0):**
+1. **Removido `src/hooks/useHandDetection.ts` (dead e partido)** — importava
+   `detectHandLandmarks` de `expo-vision-camera-v4-mediapipe`, que **não exporta essa função**
+   (é uma **global nativa** injetada, não um export — ver `index.js` do pacote). Se fosse usado,
+   rebentava (`detectHandLandmarks is not a function`) e matava o frame processor.
+2. **Removido `src/hooks/useGestures.ts` (dead)** e o import orfão em `App.tsx` — o caminho real
+   usa o frame processor inline no `App.tsx`, que está correto.
+3. **Removida dependência duplicada `react-native-worklets@0.10.1`** do `package.json` — coexistia
+   com a correta `react-native-worklets-core@1.6.3`; dois pacotes worklets é uma causa conhecida
+   de o frame processor não correr. (`npm install` reconciliado; typecheck ✅ EXIT 0.)
+
+**⚠️ Ainda por confirmar (requer device/rebuild real, fora deste ambiente):** o motivo de "não
+detetar gestos" pode ser puramente **build obsoleto no device** — as alterações nativas
+(MediaPipe, plugin `handLandmarker`, expo-iap) foram adicionadas **depois** do último `prebuild`.
+**Para validar:** re-correr `npx expo prebuild --clean` + rebuild/install no device Android e
+re-testar. Isto NÃO é um custo ($0), é o bloqueio atual. Até lá, não criar a conta Play Console.
 
 ---
 
@@ -108,7 +132,7 @@ a Conta Play Console é útil **só depois** de o reconhecimento de gestos estar
 - Keypair ES256 gerado
 
 **❌ Falta (custos/operacional):**
-- Mobile **não deteta gestos** (bloqueio central — não é custo, é bug/desenvolvimento)
+- **Rebuild + teste em device** — re-correr `npx expo prebuild --clean` + re-instalar no Android e confirmar que os **gestos são detetados** (bloqueio central atual; dead-ware/duplicatas já corrigidas, mas preciso de device real)
 - Conta Play Console ($25)
 - Conta de serviço Google Cloud ($0)
 - Deploy do license server no Render ($0)
