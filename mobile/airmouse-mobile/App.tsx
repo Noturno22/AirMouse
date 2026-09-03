@@ -18,6 +18,8 @@ import { GESTURE_LABELS, GESTURE_COLORS, HAND_CONNECTIONS } from './src/constant
 import { GestureType, HandLandmarks } from './src/types/gesture';
 import { GestureEngine, GestureResult } from './src/engine/gestures';
 import { FilterPair2D, AccelCurve } from './src/engine/filters';
+import { useProEntitlement } from './src/hooks/useProEntitlement';
+import ProGate from './src/components/ProGate';
 
 const { TouchController, KeyboardController, SystemController } = NativeModules;
 
@@ -54,6 +56,9 @@ const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
   } = useGestureStore();
 
   const { moveGain, filterMinCutoff, filterBeta } = useSettingsStore();
+
+  const proEntitlement = useProEntitlement();
+  const [showPro, setShowPro] = useState(false);
 
   const engineRef = useRef<GestureEngine | null>(null);
   const filtersRef = useRef<FilterPair2D | null>(null);
@@ -120,6 +125,11 @@ const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
   const handleAction = useCallback(
     async (event: string, value: number | null) => {
       try {
+        if (!proEntitlement.isPro) {
+          // Versão gratuita: apenas pré-visualiza gestos, não envia comandos.
+          setShowPro(true);
+          return;
+        }
         switch (event) {
           case 'tap':
             // Get palm position and tap there
@@ -185,7 +195,7 @@ const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
         console.error('Action error:', error);
       }
     },
-    [landmarks]
+    [landmarks, proEntitlement.isPro]
   );
 
   // Update FPS from the worklet via runOnJS (no React functions/refs are shared into the worklet)
@@ -508,6 +518,13 @@ const [landmarks, setLandmarks] = useState<HandLandmarks | null>(null);
           </View>
         </View>
       )}
+
+      {showPro && !proEntitlement.isPro ? (
+        <ProGate
+          entitlement={proEntitlement}
+          onClose={() => setShowPro(false)}
+        />
+      ) : null}
     </View>
   );
 }
