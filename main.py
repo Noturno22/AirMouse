@@ -15,7 +15,6 @@ import ctypes
 import logging
 import os
 import sys
-import time
 
 import cv2
 
@@ -28,6 +27,7 @@ from core.engine import run_loop
 from core.gesture_ai import GestureAI, ensure_ai_model
 from core.licensing import (
     LicenseManager,
+    UsageWatchdog,
     entitlements,
     is_pro_locked,
     set_active_license,
@@ -42,32 +42,6 @@ from core.twohand import MagnifierCtl
 from core.voice import VoiceEngine
 
 log = get_logger("cli")
-
-
-class _UsageWatchdog:
-    """Reporta o tempo de uso efetivo ao trial enquanto está Free.
-
-    Chama-se `tick()` a cada frame processado. Só quando `is_pro` ou
-    `is_blocked()` reporta; o tempo decorrido é acumulado a partir do último
-    tick. Quando o trial esgota, marca `state["license_blocked"]=True` para o
-    gate de `process_frame` bloquear o movimento.
-    """
-
-    def __init__(self, lic, state):
-        self._lic = lic
-        self._state = state
-        self._t0 = time.time()
-
-    def tick(self):
-        if self._lic.is_pro or self._lic.is_blocked():
-            return
-        now = time.time()
-        delta = int(now - self._t0)
-        self._t0 = now
-        if delta >= 1:
-            self._lic.report_usage(delta)
-            if self._lic.is_blocked():
-                self._state["license_blocked"] = True
 
 
 def parse_args():
@@ -354,7 +328,7 @@ def main():
         "license_blocked": lic_.is_blocked(),
         "_license_warned": False,
     }
-    state["_usage_watchdog"] = _UsageWatchdog(lic_, state)
+    state["_usage_watchdog"] = UsageWatchdog(lic_, state)
     tray_icon = None
     tray_adapter = None
 

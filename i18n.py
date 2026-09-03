@@ -136,6 +136,43 @@ _STRINGS = {
     "help.kb.pause": {"pt": "pausar", "en": "pause"},
     "help.kb.quit": {"pt": "sair", "en": "quit"},
     "help.kb.help": {"pt": "mostrar/ocultar ajuda", "en": "show/hide help"},
+    # ── Trial / bloqueio / ativação online ────────────────────────────────
+    "license.trial_remaining": {
+        "pt": "Trial gratis: {m} min restantes",
+        "en": "Free trial: {m} min left",
+    },
+    "license.trial_ended": {
+        "pt": "A tua experiencia Free terminou",
+        "en": "Your free experience has ended",
+    },
+    "license.trial_ended_sub": {
+        "pt": "Ativa o M\u00e3ouse PRO para continuar a controlar o cursor por gestos.",
+        "en": "Activate M\u00e3ouse PRO to keep controlling your cursor by gestures.",
+    },
+    "license.activate_now": {
+        "pt": "ATIVAR PRO AGORA",
+        "en": "ACTIVATE PRO NOW",
+    },
+    "license.revalidate_failed": {
+        "pt": "A tua licenca expirou. Liga-te para a renovar.",
+        "en": "Your license expired. Connect to renew it.",
+    },
+    "license.ledge_blocked": {
+        "pt": "Licenca nao valida nesta maquina.",
+        "en": "License not valid on this machine.",
+    },
+    "license.enter_key": {
+        "pt": "Cola primeiro a tua chave Pro.",
+        "en": "Paste your Pro key first.",
+    },
+    "license.activate_failed": {
+        "pt": "Ativacao falhou. Verifica a chave e a ligacao.",
+        "en": "Activation failed. Check the key and connection.",
+    },
+    "license.needs_connection": {
+        "pt": "Liga-te para confirmar o teu trial antes de começar.",
+        "en": "Connect to confirm your trial before starting.",
+    },
 }
 
 

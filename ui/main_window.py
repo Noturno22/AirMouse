@@ -78,6 +78,10 @@ class MainWindow(QMainWindow):
         # Aviso "2 maos = premium" mostra uma unica vez por subida do contador.
         self._twohand_free_notified = False
 
+        # Pop-up de bloqueio total: mostra UMA vez por sessão quando o
+        # trial/lease esgotou (depois disso o utilizador reabre por menu).
+        self._block_shown = False
+
         self._E = None
         self._ctx = None
         self._state = {}
@@ -392,6 +396,17 @@ class MainWindow(QMainWindow):
         if dlg.exec() == LicenseDialog.Accepted:
             self._sync_license_ui()
 
+    def _maybe_show_block_dialog(self):
+        """Mostra o pop-up de bloqueio total UMA vez por sessão, quando o
+        trial/lease esgotou (o gate já impediu o movimento)."""
+        if self._block_shown or not self._license or not self._license.is_blocked():
+            return
+        self._block_shown = True
+        from ui.license_dlg import BlockDialog
+        dlg = BlockDialog(self._cfg, self._license, self)
+        if dlg.exec() == BlockDialog.Accepted:
+            self._sync_license_ui()
+
     def _sync_license_ui(self):
         """Atualiza a UI consoante o estado da licença (Free vs Pro)."""
         is_pro = bool(self._license and self._license.is_pro)
@@ -457,6 +472,16 @@ class MainWindow(QMainWindow):
         self._state.setdefault("freeze_until", 0.0)
         self._state.setdefault("button_down", False)
         self._state.setdefault("dbg_until", 0.0)
+        # Gate de bloqueio + watchdog de uso, como no preview OpenCV.
+        self._state.setdefault(
+            "license_blocked",
+            self._license.is_blocked() if self._license else False,
+        )
+        if "_usage_watchdog" not in self._state and self._license:
+            from core.licensing import UsageWatchdog
+
+            self._state["_usage_watchdog"] = UsageWatchdog(self._license, self._state)
+        self._maybe_show_block_dialog()
         self._state["filters"] = self._E.filters
         self._state["tuner"] = self._tuner
         self._state["emitter"] = self._E.emitter

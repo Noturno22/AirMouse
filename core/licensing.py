@@ -365,6 +365,33 @@ def _default_endpoints():
 _ACTIVE: "LicenseManager | None" = None
 
 
+class UsageWatchdog:
+    """Reporta o tempo de uso efetivo ao trial enquanto está Free.
+
+    Chamado ``tick()`` a cada frame processado. Só reporta quando não é Pro nem
+    está bloqueado; o tempo decorrido é acumulado a partir do último tick.
+    Quando o trial esgota, marca ``state["license_blocked"]=True`` para o gate
+    de ``process_frame`` bloquear o movimento. Partilhado entre o preview
+    OpenCV (main.py) e a janela PySide6 (main_window.py).
+    """
+
+    def __init__(self, lic: "LicenseManager", state: dict):
+        self._lic = lic
+        self._state = state
+        self._t0 = time.time()
+
+    def tick(self) -> None:
+        if self._lic.is_pro or self._lic.is_blocked():
+            return
+        now = time.time()
+        delta = int(now - self._t0)
+        self._t0 = now
+        if delta >= 1:
+            self._lic.report_usage(delta)
+            if self._lic.is_blocked():
+                self._state["license_blocked"] = True
+
+
 def set_active_license(manager: "LicenseManager") -> None:
     global _ACTIVE
     _ACTIVE = manager
@@ -380,6 +407,6 @@ def active_tier() -> Tier:
 
 __all__ = [
     "Tier", "PRO_LOCKED", "entitlements", "is_pro_locked",
-    "LicenseManager", "LicenseAgency",
+    "LicenseManager", "LicenseAgency", "UsageWatchdog",
     "set_active_license", "active_license", "active_tier",
 ]

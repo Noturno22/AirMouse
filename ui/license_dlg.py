@@ -309,3 +309,91 @@ class LicenseDialog(QDialog):
         self._cfg.license_tier = Tier.FREE.value
         QMessageBox.information(self, "Licença", "Licença removida. Modo Free ativo.")
         self.accept()
+
+
+class BlockDialog(QDialog):
+    """Pop-up urgente de bloqueio total.
+
+    Aparece UMA vez por sessão quando o trial/lease esgotou (o gate de
+    ``process_frame`` já impediu o movimento). Sem âncora: título + subtítulo
+    sóbrios, CTA claro \"ATIVAR PRO AGORA\" (checkout) e ativação por chave.
+    """
+
+    def __init__(self, cfg, license_mgr, parent=None):
+        super().__init__(parent)
+        self._cfg = cfg
+        self._lm = license_mgr
+        self.setWindowTitle("Mãouse Pro")
+        self.setObjectName("SettingsDialog")
+        self.setStyleSheet(MAIN_STYLESHEET)
+        self.setModal(True)
+        self.setFixedWidth(460)
+        self._build()
+
+    def _build(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(28, 24, 28, 24)
+        lay.setSpacing(12)
+
+        title = QLabel(tr("license.trial_ended"))
+        title.setObjectName("HeroTitle")
+        title.setWordWrap(True)
+        lay.addWidget(title)
+
+        sub = QLabel(tr("license.trial_ended_sub"))
+        sub.setObjectName("HeroSubtitle")
+        sub.setWordWrap(True)
+        lay.addWidget(sub)
+
+        # CTA principal — abre o checkout Paddle (lifetime por omissão).
+        cta = QPushButton(f"⭐  {tr('license.activate_now')}")
+        cta.setObjectName("ProCta")
+        cta.setCursor(Qt.PointingHandCursor)
+        cta.setFixedHeight(44)
+        cta.clicked.connect(lambda: self._open_checkout("lifetime"))
+        lay.addWidget(cta)
+
+        divider = QFrame()
+        divider.setObjectName("MenuDivider")
+        divider.setFixedHeight(1)
+        lay.addSpacing(4)
+        lay.addWidget(divider)
+
+        # Ativação por chave (quem já comprou).
+        key_row = QHBoxLayout()
+        self._key_edit = QLineEdit()
+        self._key_edit.setPlaceholderText(tr("license.has_key"))
+        self._key_edit.setObjectName("KeyEdit")
+        self._key_edit.returnPressed.connect(self._activate_key)
+        key_row.addWidget(self._key_edit, 1)
+        activate = QPushButton(tr("license.activate_key"))
+        activate.setObjectName("SettingsButton")
+        activate.clicked.connect(self._activate_key)
+        key_row.addWidget(activate)
+        lay.addLayout(key_row)
+
+        self._error_lbl = QLabel()
+        self._error_lbl.setObjectName("ErrorLabel")
+        self._error_lbl.setWordWrap(True)
+        self._error_lbl.hide()
+        lay.addWidget(self._error_lbl)
+
+        lay.addStretch()
+
+    def _open_checkout(self, product):
+        if not self._lm.open_checkout(product, PADDLE_VENDOR_ID):
+            self._error_lbl.setText(tr("license.needs_connection"))
+            self._error_lbl.show()
+
+    def _activate_key(self):
+        key = self._key_edit.text().strip()
+        if not key:
+            self._error_lbl.setText(tr("license.enter_key"))
+            self._error_lbl.show()
+            return
+        if self._lm.activate(key):
+            self._cfg.license_tier = Tier.PRO.value
+            self.accept()
+        else:
+            self._error_lbl.setText(tr("license.activate_failed"))
+            self._error_lbl.show()
