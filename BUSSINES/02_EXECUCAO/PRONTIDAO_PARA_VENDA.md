@@ -18,16 +18,18 @@ venda paga:
 
 - 🔴 **O `.exe` não está assinado** (o único que falta no #1: versão/ícone/console já estão ✅) → SmartScreen/AV.
 - ✅ **Ações nativas Android funcionam** — `AccessibilityService` + Touch/Keyboard/System modules ligados no JS (2026-09-03).
-- 🔴 **Sem IAP no mobile** e o listing/posicionamento de acessibilidade está por fazer.
+- ✅ **IAP mobile Pro implementado** (expo-iap + validação Google Play no license-server) — falta o upload/listing Play Console.
 - ✅ **Paddle checkout integrado** — webhook `transaction.completed` emite a chave `MAO-` e envia por email (2026-09-03).
 - ✅ **Higiene de qualidade** — ruff 0 erros + CI GitHub Actions (feito em 2026-09-02).
 
 > **Conclusão (atualizado 2026-09-03):** o produto tem licenciamento funcional (trial + chave + lease),
 > **pagamento automático Paddle operacional** (webhook → emissão de chave + email), ações nativas
-> Android a funcionar, instalador Inno Setup funcional e `.exe` com versão/ícone/`console=False`.
-> Falta principalmente a **assinatura de código** (certificado EV/OV ×PFX — passo comercial/PKI) e o
-> **IAP/listing mobile**. Os bloqueadores abaixo são de **execução comercial** — devem entrar no
-> `PLANO_DE_EXECUCAO_90_DIAS.md` antes de qualquer feature nova.
+> Android a funcionar, **IAP mobile Pro implementado** (expo-iap + validação Google Play no
+> license-server + paywall), instalador Inno Setup funcional e `.exe` com versão/ícone/`console=False`.
+> Falta principalmente a **assinatura de código** (certificado EV/OV ×PFX — passo comercial/PKI), o
+> **upload/store listing do mobile no Play Console** e o **LAB de compatibilidade**. Os bloqueadores
+> abaixo são de **execução comercial** — devem entrar no `PLANO_DE_EXECUCAO_90_DIAS.md` antes de
+> qualquer feature nova.
 
 ---
 
@@ -55,8 +57,8 @@ venda paga:
 | EAS Build config | ✅ | `eas.json` (dev/preview/production) + `submit.production`; projectId configurado |
 | **Ações nativas Android (Touch/Keyboard/System)** | ✅ | `AirMouseAccessibilityService` (tap/longPress/swipe/drag + back/home/recents/notif) declarado no Manifest; `TouchControllerModule`/`KeyboardControllerModule`/`SystemControllerModule` registados no `MainApplication` e ligados no JS (`App.tsx` → `handleAction`). Sem root. **2026-09-03** |
 | iOS (modo remoto) | ⚠️ | `TouchController.swift`/`SystemController.swift` são **stubs de API privada** ("may cause App Store rejection"); não funcionais |
-| **IAP / Play Billing** | 🔴 | Sem expo-iap/RevenueCat; sem product IDs/fluxo/restore |
-| Store listing / posicionamento acessibilidade | 🔴 | Sem copy, sem privacy policy URL, sem vídeo de conformidade |
+| **IAP / Play Billing** | ✅ | `expo-iap` integrado (OpenIAP): compra única `maouse_mobile_pro` desbloqueia gestos Pro; validação server-side no license-server (`POST /api/v1/mobile/entitle` → Google Play Billing API → lease JWT `tier=mobile_pro`); `ProGate.tsx` paywall + restore/refresh. **2026-09-03** |
+| Store listing / posicionamento acessibilidade | 🔴 | Falta copy, privacy policy URL e vídeo de conformidade (work fica de execução comercial/Play Console; o code-side IAP já está feito) |
 | Permissões sensíveis | ✅ | Removidas as permissões mortas `WRITE_SETTINGS` e `SYSTEM_ALERT_WINDOW` (e o `setBrightness` que dependia de `WRITE_SETTINGS`) de `app.json` + templates do plugin — sem risco de rejeição Play por permissões sem uso. **2026-09-03** |
 | Marca/icons | ⚠️ | Icons "AirMouse"/template; `IDENTIDADE_VISUAL.md` marca como "precisa redesign p/ Mãouse"; LICENSE é o template MIT do Expo (não o do estúdio) |
 
@@ -69,7 +71,7 @@ venda paga:
 | Desktop — gateway (Paddle D2) | ✅ Webhook de pagamento automático integrado (emite chave + envia por email) |
 | Desktop — validação de chave/serial | ✅ Chaves MAO- com assinatura + fingerprint (core/licensing.py + license-server/) |
 | Desktop — servidor de ativação/webhook | ✅ FastAPI + SQLite (license-server/) — health, keys, activate, trial, revalidate, revoke |
-| Mobile — IAP | 🔴 Zero |
+| Mobile — IAP | ✅ `expo-iap` + validação Google Play no license-server (`POST /api/v1/mobile/entitle` → lease `tier=mobile_pro`) + paywall Pro. Falta só upload/listing Play Console. |
 | Telemetria opt-in (D6) | ⚠️ Sem endpoint/implementação |
 
 ---
@@ -79,13 +81,14 @@ venda paga:
 | # | Bloqueador | Estado | Página do plano |
 |---|---|---|---|
 | 1 | **Assinatura digital do `.exe`** (certificado EV/OV ×PFX). Metadados/ícone/`console=False` e instalador já ✅; `build.bat` + signtool prontos a assinar automaticamente quando o cert existir | 🔴 Falta o certificado (passo comercial/PKI) | S2 |
-| 2 | **IAP mobile + store listing** posicionado acessibilidade + privacy policy + icons Mãouse | 🔴 Falta | S2 |
+| 2 | **Store listing mobile** (posicionamento acessibilidade + privacy policy + icons Mãouse + upload Play Console do código com IAP) | 🔴 Falta (o **code-side IAP já está ✅**: expo-iap + validação Google no license-server + paywall Pro) | S2 |
 | 3 | **LAB de compatibilidade** (mover o gargalo de hardware para `HARDWARE/`): matriz Validado/Aceite/Não-validado preenchida em ≥5 devices por categoria crítica — evita prometer universalidade e **previne reembolsos (D7)** | 🟡 Em recolha (diretriz: ≥ i3 4ª geração) | S1–S2 |
 
 > **✅ Fechado em 2026-09-03:**
 > - **Paddle checkout automático** (webhook de pagamento → emissão de chave `MAO-` + envio por email).
 > - **Ações nativas Android** + `AccessibilityService` + remoção das permissões mortas.
 > - **Metadados do `.exe`** (versão/empresa/ícone/`console=False`) + instalador + pipeline de assinatura automático no `build.bat`.
+> - **IAP mobile Pro** (expo-iap) + **validação Google Play no license-server** (`POST /api/v1/mobile/entitle` → lease JWT `tier=mobile_pro`) + paywall `ProGate`.
 
 ---
 
@@ -94,7 +97,7 @@ venda paga:
 Pré-requisito de "vendável" e **entra antes de feature nova**:
 
 1. **Assinatura digital do `.exe`**: adquirir certificado EV/OV de code-signing (×PFX) e correr `build.bat` — o pipeline já assina o `.exe` e o instalador automaticamente. (Metadados, ícone, `console=False` e instalador Inno Setup já estão ✅.)
-2. **Mobile:** adicionar IAP + submeter com posicionamento de acessibilidade + privacy policy + icons Mãouse. (As ações nativas Android e a limpeza de permissões já estão feitas — 2026-09-03.)
+2. **Mobile:** submeter no **Play Console** com posicionamento de acessibilidade + privacy policy + icons Mãouse. (O **code-side IAP já está ✅** — 2026-09-03 — expo-iap + validação Google Play no license-server + paywall Pro; falta prebuild/upload e listing.)
 3. **Higiene de qualidade:** ✅ ruff 0 erros + CI GitHub Actions + LICENSE do estúdio + marca "Mãouse" + Inno Setup installer funcional + **Paddle automático** — **feito em 2026-09-02/03**.
 4. **LAB de hardware (área `HARDWARE/`):** preencher a `MATRIZ_DE_DISPOSITIVOS.md` com ≥5 devices por categoria crítica (desktop com GPU, desktop CPU fraco, mobile low-end) usando `HARDWARE/LAB.md` + `CHECKLIST_VALIDACAO.md`, e registar falhas em `HARDWARE/PROBLEMAS_KNOWN.md`. **Critério de "go":** ter pelo menos **1 ✅ Validado por categoria crítica** + este LAB a correr — é o que sustenta promessas honestas e reduz reembolsos (D7). **Dado recolhido (2026-09-03):** no desktop do estúdio (i3 4ª geração) funciona bem — a diretriz operacional é **"equivalente ou acima de um i3 de 4ª geração" como mínimo suportado**; abaixo disso o desempenho degrada.
 
