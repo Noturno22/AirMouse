@@ -22,6 +22,7 @@ from core.hotkeys import (
     _handle_media_event,
     _keyboard_shortcut,
 )
+from core.licensing import active_license
 from core.light import LightBoost
 from core.log import get_logger
 from core.motion import SmoothEmitter, lead_offset
@@ -191,6 +192,16 @@ def process_frame(cfg, cam, tracker, mouse, gesture_ai, voice, tuner, ctx, state
     frame, seq = cam.read()
     if frame is None:
         return {"frame": None, "done": False, "to_render": False}
+
+    # Gate de bloqueio total: quando o trial/lease expira, NÃO se move o rato.
+    # Lê a flag no state (set no arranque/atualizada pelo watchdog) OU o estado
+    # real da licença. Devolve cedo com to_render=False, que as duas UIs
+    # short-circuitam antes de renderizar (main_window._tick e run_loop).
+    if state.get("license_blocked") or active_license().is_blocked():
+        if not state.get("_license_warned"):
+            E.toast("A tua experiencia Free terminou - ativa o PRO")
+            state["_license_warned"] = True
+        return {"frame": frame, "done": False, "to_render": False}
 
     if E.warmup_left > 0:
         E.warmup_left -= 1
