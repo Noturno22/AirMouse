@@ -3,7 +3,7 @@
 > Passa do modelo de negócio para **execução**. Prioriza os **bloqueadores de receita**
 > sinalizados em `REVISAO_E_VALIDACAO.md` (§4: marca, posicionamento acessibilidade,
 > fúnel, code-signing) e integra as decisões de `DECISOES.md`.
-> **Data:** 2026-09-01 · Autor: Luar Studio Angola · Alcance: 90 dias (3 sprints de 30 dias).
+> **Data:** 2026-09-03 (atualizado) · Autor: Luar Studio Angola · Alcance: 90 dias (3 sprints de 30 dias).
 
 ---
 
@@ -108,7 +108,7 @@ auditoria WCAG + seguro RG agendados.
 |---|---|---|
 | **Implementar ações nativas Android** | Touch, Keyboard, System via módulos + **AccessibilityService** no Manifest (bloqueador nº4 de `PRONTIDAO`) | |
 | Remover permissões mortas | Tirar `WRITE_SETTINGS`/`SYSTEM_ALERT_WINDOW` se não houver código que as use (risco de rejeição Play) | |
-| **IAP de subscrição** | Play Billing / expo-iap + product IDs + restore (D1) | |
+| **IAP Pro (pago único)** | Play Billing / expo-iap + product `maouse_mobile_pro` + validação server-side no license-server (`/api/v1/mobile/entitle` → Google Play → lease `tier=mobile_pro`) + restore (**✅ code feito 2026-09-03**; falta prebuild/upload) | |
 | Store listing | Posicionamento **acessibilidade**; vídeo de conformidade; privacy policy URL; icons Mãouse | |
 | Testes em 5 dispositivos low-end | FPS, estabilidade, policy A11y | |
 | Submissão à Play Store | Posicionamento **acessibilidade** como propósito primário | |
@@ -210,15 +210,15 @@ institucional ativo, decisão de direção Y2 tomada com dados.
 
 ### 7.2 Bloqueadores de venda (implementação = código)
 
-| # | Bloqueador | Estado (2026-09-02) | Onde implementar |
+| # | Bloqueador | Estado (2026-09-03) | Onde implementar |
 |---|---|---|---|
 | 1 | Licenciamento + gate Free/Pro + trial + leases | ✅ Feito — servidor FastAPI+SQLite em `license-server/`; cliente em `core/licensing.py`/`license_client.py`/`fingerprint.py`; gate em `core/engine.py:process_frame` | Desktop |
-| 1b | **Paddle checkout** (pagamento automático → emissão de chave + email) | 🔴 Falta integrar webhooks/checkout | Desktop (S2) |
+| 1b | **Paddle checkout** (pagamento automático → emissão de chave + email) | ✅ Feito — webhook `transaction.completed` com HMAC + dedup + email (`license-server/paddle.py`) | Desktop (S2) |
 | 2 | Gate + modal de upgrade | ✅ `ui/license_dlg.py` (upgrade/desativação) | Desktop |
-| 3 | `.exe` polido (assinatura/ícone/versão/console=False) | 🔴 Falta | Desktop (S2) |
+| 3 | `.exe` polido (assinatura/ícone/versão/console=False) | 🔴 Só falta **assinatura de código** (cert EV/OV ×PFX); ícone/versão/console/instalador/pipeline de assinatura automática já ✅ | Desktop (S2) |
 | 3b | Instalador 1-clique (Inno Setup) | ✅ Feito — `installer.iss` + `dist/Maouse-Setup-1.0.0.exe` (15,6 MB) | Desktop (S1) |
-| 4 | Ações nativas Android + AccessibilityService | 🔴 Falta | `mobile/airmouse-mobile/` (S2) |
-| 5 | IAP + store listing mobile | 🔴 Falta | `mobile/airmouse-mobile/` (S2) |
+| 4 | Ações nativas Android + AccessibilityService | ✅ Feito — `AirMouseAccessibilityService` + Touch/Keyboard/System modules ligados no JS; permissões mortas removidas | `mobile/airmouse-mobile/` (S2) |
+| 5 | **IAP mobile + store listing** | 🟡 **IAP ✅ code feito** (expo-iap + validação Google no license-server + paywall `ProGate`); falta **prebuild/upload/listing Play Console** | `mobile/airmouse-mobile/` (S2) |
 | 6 | LAB de hardware a correr / preencher matriz | 🟡 | `HARDWARE/` (S1–S2) |
 
 ### 7.3 Testes de hardware já feitos
@@ -229,15 +229,16 @@ institucional ativo, decisão de direção Y2 tomada com dados.
 
 ### 7.4 Próximo passo (escolher UMA via)
 
-- **A) Testar hardware real** — mais rápido de fazer e desbloqueia a matriz:
+- **A) Fechar blockers de execução comercial → 1ª venda paga:**
+  - ✅ Licenciamento + trial + leases + **Paddle automático** + gate + **IAP mobile Pro** (code) já feitos.
+  - 🔴 Falta (execução, não código): **certificado de code-signing** (EV/OV ×PFX → assinar `.exe`/instalador via `build.bat`) + **prebuild/upload/listing mobile Play Console** + **LAB de hardware** na matriz.
+- **B) Testar hardware real** — desbloqueia a matriz e as promessas honestas:
   - Desktop com GPU/NPU (confirmar se sobe aos 25+ fps → ✅).
-  - 1º telemóvel low-end Android (bloqueador nº4, risco tela preta).
-- **B) Implementar código** — desbloqueia a 1ª venda paga:
-  - ✅ Licenciamento + gate Free/Pro + trial server-authoritative + leases ES256 **já feitos**.
-  - 🔴 Falta: **Paddle checkout** (webhook → emissão de chave + email) + `.exe` polido (bloqueador nº1b/3).
+  - 1º telemóvel low-end Android (risco tela preta).
 
-> Recomendação: como o **gargalo é hardware**, testar um **desktop com GPU** primeiro dá a
-> prova rápida de que o produto sobe a 25+ fps (desbloqueia ✅ no marketing e contratos).
+> Recomendação: como o **gargalo é hardware**, testar um **desktop com GPU** primeiro dá a prova
+> rápida de que o produto sobe a 25+ fps (desbloqueia ✅ no marketing e contratos); em paralelo
+> trata-se do **certificado de code-signing** (bloqueador desktop nº1) e do **upload/listing mobile**.
 
 ---
 
