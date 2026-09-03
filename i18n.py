@@ -37,36 +37,36 @@ _STRINGS = {
     "btn.upgrade": {"pt": "UPGRADE PRO", "en": "UPGRADE PRO"},
     "btn.pro_active": {"pt": "PRO ATIVO", "en": "PRO ACTIVE"},
     "license.free_badge": {"pt": "MODO FREE — TESTE SEMPRE", "en": "FREE MODE — ALWAYS TRIAL"},
-    "license.free_sub": {"pt": "Está no modo de teste: gratuito, sem data de fim.", "en": "You are in trial mode: free, with no expiry date."},
+    "license.free_sub": {"pt": "Está no modo de teste: gratuito, sem data de fim.", "en": "You are in trial mode: free, with no expiry date."},  # noqa: E501
     "license.hero": {"pt": "Uma nova experiência tecnológica", "en": "A brand-new tech experience"},
-    "license.hero_sub": {"pt": "Tudo o que já usa ficou mágico. Desbloqueie todo o poder do AirMouse.", "en": "Everything you use just got magical. Unlock the full power of AirMouse."},
-    "license.unlocks_title": {"pt": "O QUE DESBLOQUEIA — EXPERIÊNCIA REVOLUCIONÁRIA", "en": "WHAT YOU UNLOCK — REVOLUTIONARY EXPERIENCE"},
-    "license.cta": {"pt": "ATIVAR PRO · EXPERIÊNCIA COMPLETA", "en": "ACTIVATE PRO · FULL EXPERIENCE"},
-    "license.has_key": {"pt": "Já tem uma chave Pro? Cole-a aqui", "en": "Already have a Pro key? Paste it here"},
+    "license.hero_sub": {"pt": "Tudo o que já usa ficou mágico. Desbloqueie todo o poder do Mãouse.", "en": "Everything you use just got magical. Unlock the full power of Mãouse."},  # noqa: E501
+    "license.unlocks_title": {"pt": "O QUE DESBLOQUEIA — EXPERIÊNCIA REVOLUCIONÁRIA", "en": "WHAT YOU UNLOCK — REVOLUTIONARY EXPERIENCE"},  # noqa: E501
+    "license.cta": {"pt": "ATIVAR PRO · EXPERIÊNCIA COMPLETA", "en": "ACTIVATE PRO · FULL EXPERIENCE"},  # noqa: E501
+    "license.has_key": {"pt": "Já tem uma chave Pro? Cole-a aqui", "en": "Already have a Pro key? Paste it here"},  # noqa: E501
     "license.activate_key": {"pt": "Ativar Chave", "en": "Activate Key"},
-    "license.pro_active_title": {"pt": "A sua licença Pro está ativa 💎", "en": "Your Pro license is active 💎"},
-    "license.pro_active_sub": {"pt": "Obrigado por apoiar o AirMouse. Toda a experiência tecnológica está desbloqueada.", "en": "Thank you for supporting AirMouse. The full tech experience is unlocked."},
-    "license.remove": {"pt": "Remover Licença (voltar a Free)", "en": "Remove License (back to Free)"},
+    "license.pro_active_title": {"pt": "A sua licença Pro está ativa 💎", "en": "Your Pro license is active 💎"},  # noqa: E501
+    "license.pro_active_sub": {"pt": "Obrigado por apoiar o Mãouse. Toda a experiência tecnológica está desbloqueada.", "en": "Thank you for supporting Mãouse. The full tech experience is unlocked."},  # noqa: E501
+    "license.remove": {"pt": "Remover Licença (voltar a Free)", "en": "Remove License (back to Free)"},  # noqa: E501
     "benefit.snap": {"pt": "Snap magnético", "en": "Magnetic snap"},
-    "benefit.snap_d": {"pt": "O cursor “gruda” nos botões — cliques certeiros à primeira.", "en": "The cursor sticks to buttons — perfect clicks every time."},
+    "benefit.snap_d": {"pt": "O cursor “gruda” nos botões — cliques certeiros à primeira.", "en": "The cursor sticks to buttons — perfect clicks every time."},  # noqa: E501
     "benefit.voice": {"pt": "Voz “Jarvis” + TTS neural", "en": "“Jarvis” voice + neural TTS"},
-    "benefit.voice_d": {"pt": "Controle tudo por voz, com resposta natural e incrível.", "en": "Control everything by voice, with natural, incredible responses."},
+    "benefit.voice_d": {"pt": "Controle tudo por voz, com resposta natural e incrível.", "en": "Control everything by voice, with natural, incredible responses."},  # noqa: E501
     "benefit.hands": {"pt": "Duas mãos", "en": "Two hands"},
-    "benefit.hands_d": {"pt": "Lupa de zoom, brilho e gestos avançados com as duas mãos.", "en": "Zoom magnifier, brightness and advanced gestures with both hands."},
+    "benefit.hands_d": {"pt": "Lupa de zoom, brilho e gestos avançados com as duas mãos.", "en": "Zoom magnifier, brightness and advanced gestures with both hands."},  # noqa: E501
     "benefit.ai": {"pt": "IA avançada + auto-afinação", "en": "Advanced AI + auto-tuning"},
-    "benefit.ai_d": {"pt": "O sistema aprende consigo e fica cada vez mais rápido.", "en": "The system learns from you and gets faster every time."},
+    "benefit.ai_d": {"pt": "O sistema aprende consigo e fica cada vez mais rápido.", "en": "The system learns from you and gets faster every time."},  # noqa: E501
     "benefit.lowlight": {"pt": "Modo luz baixa", "en": "Low-light mode"},
-    "benefit.lowlight_d": {"pt": "Funciona perfeitamente mesmo no escuro.", "en": "Works perfectly even in the dark."},
+    "benefit.lowlight_d": {"pt": "Funciona perfeitamente mesmo no escuro.", "en": "Works perfectly even in the dark."},  # noqa: E501
     "benefit.boot": {"pt": "Arranque automático", "en": "Auto-start"},
-    "benefit.boot_d": {"pt": "Pronto a usar assim que liga o computador.", "en": "Ready to use the moment you turn on your PC."},
+    "benefit.boot_d": {"pt": "Pronto a usar assim que liga o computador.", "en": "Ready to use the moment you turn on your PC."},  # noqa: E501
     "benefit.precision": {"pt": "Precisão cirúrgica", "en": "Surgical precision"},
-    "benefit.precision_d": {"pt": "Resposta mais rápida e movimentos ultra-suaves.", "en": "Faster response and ultra-smooth movement."},
+    "benefit.precision_d": {"pt": "Resposta mais rápida e movimentos ultra-suaves.", "en": "Faster response and ultra-smooth movement."},  # noqa: E501
     "benefit.custom": {"pt": "Personalização total", "en": "Full customization"},
-    "benefit.custom_d": {"pt": "Tudo à sua medida: gestos, sensibilidade, atalhos.", "en": "Everything tailored to you: gestures, sensitivity, shortcuts."},
-    "benefit.snap_short": {"pt": "cliques certeiros à primeira", "en": "perfect clicks, first time"},
-    "benefit.voice_short": {"pt": "controle tudo por voz natural", "en": "control everything by natural voice"},
-    "benefit.hands_short": {"pt": "zoom, brilho e gestos avançados", "en": "zoom, brightness & advanced gestures"},
-    "benefit.ai_short": {"pt": "o sistema aprende consigo e acelera", "en": "the system learns from you and speeds up"},
+    "benefit.custom_d": {"pt": "Tudo à sua medida: gestos, sensibilidade, atalhos.", "en": "Everything tailored to you: gestures, sensitivity, shortcuts."},  # noqa: E501
+    "benefit.snap_short": {"pt": "cliques certeiros à primeira", "en": "perfect clicks, first time"},  # noqa: E501
+    "benefit.voice_short": {"pt": "controle tudo por voz natural", "en": "control everything by natural voice"},  # noqa: E501
+    "benefit.hands_short": {"pt": "zoom, brilho e gestos avançados", "en": "zoom, brightness & advanced gestures"},  # noqa: E501
+    "benefit.ai_short": {"pt": "o sistema aprende consigo e acelera", "en": "the system learns from you and speeds up"},  # noqa: E501
     "toast.pause": {"pt": "PAUSA", "en": "PAUSED"},
     "toast.resume": {"pt": "RETOMAR", "en": "RESUMED"},
     "toast.saved": {"pt": "GRAVAR", "en": "SAVED"},
@@ -119,9 +119,9 @@ _STRINGS = {
     "help.g.zoomm": {"pt": "2 mãos abertas + afastar", "en": "2 open hands + apart"},
     "help.g.zoom": {"pt": "lupa (zoom)", "en": "magnifier (zoom)"},
     "help.g.swipe": {"pt": "swipe · mão esq", "en": "swipe · left hand"},
-    "help.g.nextwin": {"pt": "próxima janela (Alt+Tab rápido)", "en": "next window (quick Alt+Tab)"},
+    "help.g.nextwin": {"pt": "próxima janela (Alt+Tab rápido)", "en": "next window (quick Alt+Tab)"},  # noqa: E501
     "help.g.swipel": {"pt": "swipe p/ esq · mão esq", "en": "swipe left · left hand"},
-    "help.g.prevwin": {"pt": "janela anterior (Alt+Shift+Tab)", "en": "previous window (Alt+Shift+Tab)"},
+    "help.g.prevwin": {"pt": "janela anterior (Alt+Shift+Tab)", "en": "previous window (Alt+Shift+Tab)"},  # noqa: E501
     "help.g.hold": {"pt": "segurar mão esq aberta", "en": "hold left open hand"},
     "help.g.switch": {"pt": "escolher janela (alternador)", "en": "choose window (switcher)"},
     "help.g.peace_toggle": {"pt": "paz (2 dedos) · mão esq", "en": "peace (2 fingers) · left hand"},

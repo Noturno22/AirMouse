@@ -14,8 +14,8 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QMainWindow, QWidget
 
 from config import SMOOTH_PRESETS, save_settings
-from i18n import I18N, tr
 from core.gestures import Gesture
+from i18n import I18N, tr
 from ui.camera_view import CameraView
 from ui.gesture_badge import GestureBadge
 from ui.help_panel import HelpPanel
@@ -97,7 +97,7 @@ class MainWindow(QMainWindow):
         self._timer.start(0)
 
     def _build_ui(self):
-        self.setWindowTitle("AirMouse")
+        self.setWindowTitle("Mãouse")
         self.setObjectName("MainWindow")
         self.setMinimumSize(640, 480)
         self.resize(800, 600)

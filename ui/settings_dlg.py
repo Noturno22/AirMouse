@@ -24,7 +24,7 @@ class SettingsDialog(QDialog):
         self._cfg = cfg
         self._smooth_name = smooth_name
         self._tier = license_mgr.tier if license_mgr is not None else Tier.FREE
-        self.setWindowTitle("Definições — AirMouse")
+        self.setWindowTitle("Definições — Mãouse")
         self.setObjectName("SettingsDialog")
         self.setFixedSize(430, 640)
         self.setStyleSheet(MAIN_STYLESHEET)

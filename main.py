@@ -51,7 +51,7 @@ def parse_args():
     possam inspecionar as flags disponíveis sem depender do ``sys.argv`` real.
     O parsing efetivo acontece em ``main()`` via ``parse_args().parse_args()``.
     """
-    parser = argparse.ArgumentParser(description="AirMouse - controla o rato com a mao")
+    parser = argparse.ArgumentParser(description="Mãouse - controla o rato com a mao")
     parser.add_argument("--camera", type=int, default=None)
     parser.add_argument("--gain", type=float, default=None)
     parser.add_argument("--no-preview", action="store_true")
@@ -158,7 +158,7 @@ def run_gui(cfg, cam, tracker, mouse, smooth_idx, gesture_ai, voice, tuner, spea
         assistant=assistant, magnifier=magnifier,
         license_mgr=license_mgr,
     )
-    window.setWindowTitle("AirMouse")
+    window.setWindowTitle("Mãouse")
     window.resize(900, 640)
     # Arranca OCULTA: a interface so aparece com o comando gui_toggle
     # (gesto de paz com a mao esquerda). Serve apenas para configuracao.
@@ -212,7 +212,7 @@ def main():
 
     mutex = acquire_single_instance()
     if mutex is None:
-        log.info("AirMouse ja esta em execucao.")
+        log.info("Mãouse ja esta em execucao.")
         return 1
 
     if args.reset_config:
@@ -336,7 +336,7 @@ def main():
         note = apply_command(action, value, cfg, mouse, state, ctx)
         if note and not cfg.preview:
             if tray_icon:
-                tray_icon.notify("AirMouse", note)
+                tray_icon.notify("Mãouse", note)
             log.info("[bandeja] %s", note)
 
     if args.tray:

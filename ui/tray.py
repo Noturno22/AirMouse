@@ -18,7 +18,7 @@ class SystemTray(QSystemTrayIcon):
         super().__init__(parent)
         if icon_path:
             self.setIcon(QIcon(icon_path))
-        self.setToolTip("AirMouse")
+        self.setToolTip("Mãouse")
         self._build_menu()
 
     def _build_menu(self):

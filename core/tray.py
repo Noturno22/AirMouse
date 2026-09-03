@@ -54,9 +54,9 @@ class TrayIcon:
     def start(self):
         try:
             self.icon = pystray.Icon(
-                "AirMouse",
+                "Mãouse",
                 icon=_build_icon_image(True),
-                title="AirMouse JARVIS",
+                title="Mãouse",
                 menu=self._menu(),
             )
             t = threading.Thread(target=self.icon.run, daemon=True)
