@@ -15,6 +15,12 @@ from core.license_client import LicenseClient, LicenseError
 TRIAL_DEFAULT_SECONDS = 30 * 60
 LEASE_DEFAULT_DAYS = 7
 
+# URL do license-server de PRODUÇÃO. É o ÚNICO ponto a preencher quando o servidor
+# for deployado (ver docs/DESKTOP_LICENSE_URL.md). Em runtime é sobreposto pela env
+# AIRMOUSE_LICENSE_URLS (usada para apontar a servidores de teste/QA).
+# TODO(producao): substituir pelo URL real do Render.
+PROD_LICENSE_SERVER_URL = "https://licenses.maouse.example.com"
+
 _PUBLIC_KEY_PEM = os.path.join(os.path.dirname(__file__), "licensing_public_key.pem")
 
 
@@ -357,9 +363,7 @@ def _store_exists(store_path: str) -> bool:
 
 def _default_endpoints():
     raw = os.getenv("AIRMOUSE_LICENSE_URLS", "")
-    return [u.strip() for u in raw.split(",") if u.strip()] or [
-        "https://licenses.maouse.example.com"
-    ]
+    return [u.strip() for u in raw.split(",") if u.strip()] or [PROD_LICENSE_SERVER_URL]
 
 
 _ACTIVE: "LicenseManager | None" = None

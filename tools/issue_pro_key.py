@@ -10,13 +10,16 @@ import sys
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.licensing import PROD_LICENSE_SERVER_URL
+
 
 def main():
     if len(sys.argv) < 2:
         print("Uso: python tools/issue_pro_key.py <email-do-comprador>")
         return 1
     email = sys.argv[1]
-    url = (os.getenv("AIRMOUSE_LS_URL", "") or "https://licenses.maouse.example.com").rstrip("/")
+    url = (os.getenv("AIRMOUSE_LS_URL", "") or PROD_LICENSE_SERVER_URL).rstrip("/")
     token = os.getenv("AIRMOUSE_LS_ADMIN_TOKEN", "")
     if not token:
         print("ERRO: defina AIRMOUSE_LS_ADMIN_TOKEN.")

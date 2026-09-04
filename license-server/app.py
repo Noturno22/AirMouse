@@ -106,11 +106,14 @@ def create_app() -> FastAPI:
     def api_mobile_entitle(req: MobileEntitleRequest, db=Depends(get_db)):
         expected_product = os.getenv("AIRMOUSE_MOBILE_PRODUCT_ID",
                                      "maouse_mobile_pro")
+        expected_package = os.getenv("AIRMOUSE_MOBILE_PACKAGE_NAME",
+                                     "com.airmouse.mobile")
         from playstore import PlayValidationError, validate_purchase
         try:
             lease, session_id, first_time = mobile_entitle(
                 db, req.purchase_token, req.product_id, req.package_name,
-                req.device_id, expected_product, validate_purchase)
+                req.device_id, expected_product, expected_package,
+                validate_purchase)
         except ValueError as exc:
             return JSONResponse(status_code=422, content={"error": str(exc)})
         except PlayValidationError as exc:

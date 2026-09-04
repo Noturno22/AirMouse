@@ -12,7 +12,7 @@ from security import decode_jwt
 
 VALID_DEV_TOKEN = "test_valid_dev_token_123"
 PRODUCT_ID = "maouse_mobile_pro"
-PACKAGE = "app.maouse.mobile"
+PACKAGE = "com.airmouse.mobile"
 DEVICE = "device-instance-abc"
 
 
@@ -88,3 +88,14 @@ def test_entitle_rejects_wrong_product(client):
     })
     assert resp.status_code == 422
     assert resp.json()["error"] == "produto_errado"
+
+
+def test_entitle_rejects_wrong_package(client):
+    resp = client.post("/api/v1/mobile/entitle", json={
+        "purchase_token": "test_wrong_package",
+        "product_id": PRODUCT_ID,
+        "package_name": "com.evil.app",
+        "device_id": DEVICE,
+    })
+    assert resp.status_code == 422
+    assert resp.json()["error"] == "pacote_errado"

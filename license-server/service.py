@@ -119,13 +119,14 @@ def activate(conn, key: str, machine_id: str) -> tuple[str, str, int]:
 
 def mobile_entitle(conn, purchase_token: str, product_id: str,
                    package_name: str, device_id: str, expected_product: str,
+                   expected_package: str,
                    validate) -> tuple[str, str, bool]:
     """Desbloqueia 'mobile_pro' via uma compra IAP (Google Play). Single purchase.
 
     - validate(package_name, product_id, purchase_token) levanta
-      PlayValidationError se o token não for válido.
-    - Dedup anti-replay por purchase_token (o mesmo token só gera entitlement
-      uma vez; depois é reaproveitado sem chamar a API do Google).
+      PlayValidationError se o token nǜo for vǭlido.
+    - Dedup anti-replay por purchase_token (o mesmo token s�� gera entitlement
+      uma vez; depois Ǹ reaproveitado sem chamar a API do Google).
     - Devolve (lease, session_id, first_time).
     """
     purchase_token = purchase_token.strip()
@@ -133,6 +134,8 @@ def mobile_entitle(conn, purchase_token: str, product_id: str,
         raise ValueError("token_vazio")
     if product_id != expected_product:
         raise ValueError("produto_errado")
+    if package_name != expected_package:
+        raise ValueError("pacote_errado")
 
     key_hash = f"MOB:{hash_key(purchase_token)[:16].upper()}"
     existing = mobile_purchase_for_token(conn, purchase_token)

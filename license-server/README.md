@@ -15,6 +15,7 @@ ativação por fingerprint, leases JWT ES256) e o **mobile** (validação de com
 | `AIRMOUSE_GOOGLE_PLAY_CREDENTIALS_JSON` | IAP real | JSON da conta de serviço com permissão **Android Publisher API**. Sem isto, `mobile/entitle` só funciona em modo dev |
 | `AIRMOUSE_MOBILE_DEV_ALLOW=1` | **nunca em produção** | Aceita tokens de teste prefixados `test_` |
 | `AIRMOUSE_MOBILE_PRODUCT_ID` | não | Product ID do Pro (default `maouse_mobile_pro`) |
+| `AIRMOUSE_MOBILE_PACKAGE_NAME` | não | Package Android esperado (default `com.airmouse.mobile`) — rejeita `pacote_errado` se o cliente enviar outro |
 
 ## Endpoints
 
