@@ -61,12 +61,13 @@
       ]
     ],
     "extra": {
-      "eas": {
-        "projectId": "8854f8b4-5ff4-4b8f-8279-6df948fbf502"
-      },
       "licenseServerUrl": "https://license.maouse.app",
       "mobileProductId": "maouse_mobile_pro",
-      "androidPackage": "com.airmouse.mobile"
-    }
+      "androidPackage": "com.airmouse.mobile",
+      "eas": {
+        "projectId": "b411e021-d37e-405f-a287-2e6f8be101b5"
+      }
+    },
+    "owner": "isabel239898"
   }
 }
