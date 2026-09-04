@@ -1,6 +1,10 @@
 import threading
 import time
 
+from core.log import get_logger
+
+log = get_logger("motion")
+
 
 class SmoothEmitter:
     """Distribui deslocamentos do cursor por micro-passos a alta frequencia.
@@ -108,8 +112,8 @@ class SmoothEmitter:
                     self._accy -= iy
                 try:
                     self._mouse.move_by(ix, iy)
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug("move_by(%s,%s) falhou: %s", ix, iy, e)
 
 
 def lead_offset(vx, vy, predict_ms):

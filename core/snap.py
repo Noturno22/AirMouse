@@ -4,6 +4,8 @@ import math
 import threading
 import time
 
+from core.log import get_logger
+
 try:
     import uiautomation as auto
 
@@ -11,6 +13,8 @@ try:
 except Exception:
     auto = None
     _AUTO_OK = False
+
+log = get_logger("snap")
 
 CLICKABLE_TYPES = frozenset(
     {
@@ -132,8 +136,8 @@ class SnapEngine:
             name = ctrl.ControlTypeName
             if name in CLICKABLE_TYPES:
                 return True
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("ControlTypeName indispon\u00edvel: %s", e)
         try:
             pat = ctrl.GetPattern(auto.PatternId.InvokePattern)
             return pat is not None

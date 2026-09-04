@@ -7,6 +7,9 @@ import time
 from typing import Any
 
 from config import SMOOTH_PRESETS, save_settings
+from core.log import get_logger
+
+log = get_logger("commands")
 
 
 class AppCtl:
@@ -35,8 +38,8 @@ def _click_assist(ctx, state, mouse, cfg):
         if target is not None:
             mouse.mouse.position = (int(target[0]), int(target[1]))
             state["assist_used"] = True
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Click-assist falhou: %s", e)
 
 
 def apply_command(action, value, cfg, mouse, state, ctx):

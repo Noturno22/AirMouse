@@ -7,6 +7,10 @@ import time
 import webbrowser
 import winreg
 
+from core.log import get_logger
+
+log = get_logger("assistant")
+
 CREATE_NO_WINDOW = 0x08000000
 WM_CLOSE = 0x0010
 
@@ -121,8 +125,8 @@ class Assistant3D:
         for hwnd in wins:
             try:
                 ctypes.windll.user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao enviar WM_CLOSE para janela %r: %s", hwnd, e)
         return len(wins)
 
     def toggle(self):

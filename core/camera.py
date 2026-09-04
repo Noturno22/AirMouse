@@ -3,6 +3,10 @@ import time
 
 import cv2
 
+from core.log import get_logger
+
+log = get_logger("camera")
+
 
 class CameraStream:
     def __init__(self, index):
@@ -49,15 +53,15 @@ class CameraStream:
     def _apply_config(cap, width, height, fps):
         try:
             cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("MJPG n\u00e3o suportado pelo driver: %s", e)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
         cap.set(cv2.CAP_PROP_FPS, fps)
         try:
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("BUFFERSIZE=1 n\u00e3o suportado: %s", e)
 
     def _probe(self, cap, timeout_s):
         deadline = time.perf_counter() + timeout_s

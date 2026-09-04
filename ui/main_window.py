@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QLabel, QMainWindow, QWidget
 
 from config import SMOOTH_PRESETS, save_settings
 from core.gestures import Gesture
+from core.log import get_logger
 from i18n import I18N, tr
 from ui.camera_view import CameraView
 from ui.gesture_badge import GestureBadge
@@ -29,6 +30,8 @@ from ui.theme import (
 )
 from ui.toast import Toast
 from ui.voice_bar import VoiceBar
+
+log = get_logger("main_window")
 
 
 class MainWindow(QMainWindow):
@@ -225,8 +228,8 @@ class MainWindow(QMainWindow):
                     ch = getattr(key, "char", None)
                     if ch in ("a", "A", "\x01") and {"ctrl", "shift"} <= pressed:
                         self.hotkey_toggle.emit()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Erro no callback de hotkey (press): %s", e)
 
         def on_release(key):
             try:
@@ -234,8 +237,8 @@ class MainWindow(QMainWindow):
                     pressed.discard("ctrl")
                 elif key in (keyboard.Key.shift_l, keyboard.Key.shift_r):
                     pressed.discard("shift")
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Erro no callback de hotkey (release): %s", e)
 
         try:
             self.hotkey_toggle.connect(self._toggle_ui_global)
@@ -602,8 +605,8 @@ class MainWindow(QMainWindow):
                 kb.press(k)
             for k in reversed(keys):
                 kb.release(k)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao emitir atalho de teclado: %s", e)
 
     @staticmethod
     def _handle_media(event, value):
@@ -635,19 +638,19 @@ class MainWindow(QMainWindow):
         if self._hotkey_listener is not None:
             try:
                 self._hotkey_listener.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao parar o listener de hotkey: %s", e)
             self._hotkey_listener = None
         try:
             if self._E is not None and self._E.emitter is not None:
                 self._E.emitter.stop()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao parar o emitter: %s", e)
         try:
             if self._state.get("button_down"):
                 self._mouse.release_left()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao largar o botao no fecho: %s", e)
         for obj, meth in (
             (self._snap, "stop"), (self._voice, "stop"),
             (self._speaker, "stop"), (self._tracker, "close"),
@@ -657,10 +660,10 @@ class MainWindow(QMainWindow):
                 continue
             try:
                 getattr(obj, meth)()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao fechar %s.%s: %s", type(obj).__name__, meth, e)
         try:
             cv2.destroyAllWindows()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao fechar janelas OpenCV: %s", e)
         event.accept()

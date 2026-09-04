@@ -11,6 +11,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 
 from core.fingerprint import machine_id
 from core.license_client import LicenseClient, LicenseError
+from core.log import get_logger
+
+log = get_logger("licensing")
 
 TRIAL_DEFAULT_SECONDS = 30 * 60
 LEASE_DEFAULT_DAYS = 7
@@ -117,8 +120,8 @@ class LicenseManager:
             return
         try:
             self._client.trial_report(self._machine, self._trial_used)
-        except LicenseError:
-            pass
+        except LicenseError as e:
+            log.debug("Relat\u00f3rio de trial ao servidor falhou: %s", e)
         self._trial_used = max(self._trial_used, server_used)
         if self._trial_used >= self._trial_seconds:
             self._blocked = True
@@ -147,8 +150,8 @@ class LicenseManager:
                     "last_nonce": self._last_nonce,
                     "last_use_seq": self._last_use_seq,
                 }, fh, indent=2)
-        except OSError:
-            pass
+        except OSError as e:
+            log.debug("Falha ao gravar estado de licen\u00e7a em %s: %s", self._store_path, e)
 
     def load(self) -> None:
         if self._store_path == ":memory:":
@@ -303,8 +306,8 @@ class LicenseManager:
         if os.path.exists(self._store_path):
             try:
                 os.remove(self._store_path)
-            except OSError:
-                pass
+            except OSError as e:
+                log.debug("Falha ao remover store de licen\u00e7a %s: %s", self._store_path, e)
 
     def checkout_urls(self, vendor_id: int) -> dict[str, str]:
         url = PADDLE_PRODUCT_URLS.get("lifetime")

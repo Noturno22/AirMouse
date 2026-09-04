@@ -8,6 +8,10 @@ import wave
 import numpy as np
 import sounddevice as sd
 
+from core.log import get_logger
+
+log = get_logger("tts")
+
 
 def _download(url, path):
     parent = os.path.dirname(path)
@@ -57,8 +61,8 @@ class Speaker:
         self._running = False
         try:
             self._q.put_nowait(None)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao acordar a thread TTS: %s", e)
         if self._thread is not None:
             self._thread.join(timeout=2.0)
             self._thread = None
@@ -81,8 +85,8 @@ class Speaker:
             try:
                 self._q.get_nowait()
                 self._q.put_nowait(text)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha a substituir item na fila TTS: %s", e)
 
     def _ensure_voice(self):
         for url, path in self.voice_files:
@@ -111,8 +115,8 @@ class Speaker:
             self._sapi = pyttsx3.init()
             try:
                 self._sapi.setProperty("rate", 185)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao ajustar rate do SAPI: %s", e)
             self.engine_name = "sapi5"
         except Exception:
             self.engine_name = "off"
@@ -133,8 +137,8 @@ class Speaker:
             frames = wf.readframes(wf.getnframes())
         try:
             os.remove(out)
-        except OSError:
-            pass
+        except OSError as e:
+            log.debug("Falha ao remover WAV tempor\u00e1rio %s: %s", out, e)
         data = np.frombuffer(frames, dtype=np.int16)
         return data, sr
 
@@ -166,5 +170,5 @@ class Speaker:
                 try:
                     self._sapi.say(text)
                     self._sapi.runAndWait()
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.debug("Falha ao reproduzir voz SAPI: %s", e)

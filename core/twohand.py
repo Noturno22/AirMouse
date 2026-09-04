@@ -3,6 +3,9 @@ import subprocess
 import time
 
 from core.gestures import Gesture, GestureEngine
+from core.log import get_logger
+
+log = get_logger("twohand")
 
 CREATE_NO_WINDOW = 0x08000000
 
@@ -269,8 +272,8 @@ class BrightnessCtl:
                 ramp[512 + i] = v
             self._gdi32.SetDeviceGammaRamp(hdc, __import__("ctypes").byref(ramp))
             self._user32.ReleaseDC(None, hdc)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao ajustar brilho (gamma): %s", e)
 
 
 class FistCycleDetector:

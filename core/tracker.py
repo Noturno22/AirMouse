@@ -5,6 +5,10 @@ import mediapipe as mp
 from mediapipe.tasks import python as mp_tasks
 from mediapipe.tasks.python import vision
 
+from core.log import get_logger
+
+log = get_logger("tracker")
+
 HAND_CONNECTIONS = (
     (0, 1), (1, 2), (2, 3), (3, 4),
     (0, 5), (5, 6), (6, 7), (7, 8),
@@ -36,8 +40,8 @@ def ensure_model(path, url, timeout_s=15.0):
     except Exception:
         try:
             os.remove(tmp)
-        except OSError:
-            pass
+        except OSError as e:
+            log.debug("N\u00e3o foi poss\u00edvel limpar ficheiro tempor\u00e1rio %s: %s", tmp, e)
         raise
     print("Modelo pronto.")
     return path

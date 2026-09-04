@@ -12,7 +12,10 @@ import zipfile
 
 import numpy as np
 
+from core.log import get_logger
 from core.nlu import parse_local, parse_with_llm
+
+log = get_logger("voice")
 
 WAKE_ALIASES = ("jarvis", "jarbas", "assistente", "computador")
 
@@ -41,8 +44,8 @@ def _find_model_dir(base, preferred):
             full = os.path.join(base, name)
             if os.path.isdir(full) and name.startswith("vosk-model") and "pt" in name:
                 candidates.append(full)
-    except OSError:
-        pass
+    except OSError as e:
+        log.debug("Falha a listar %s \u00e0 procura de modelo Vosk: %s", base, e)
     for c in candidates:
         if valid_model_dir(c):
             return c
@@ -179,8 +182,8 @@ class VoiceEngine:
             try:
                 self._stream.stop()
                 self._stream.close()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao parar o stream de \u00e1udio: %s", e)
             self._stream = None
 
     def _beep(self):
@@ -191,8 +194,8 @@ class VoiceEngine:
             t = np.linspace(0, 0.09, int(sr * 0.09), False)
             tone = (np.sin(2 * np.pi * 880 * t) * 12000).astype(np.int16)
             sd.play(tone, sr)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Falha ao reproduzir beep de alerta: %s", e)
 
     def _get_whisper(self):
         if self._whisper is not None:
@@ -364,8 +367,8 @@ class VoiceEngine:
                 if mode == "chat":
                     self._reply_conversation(text)
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Erro ao processar comando de voz: %s", e)
 
         # 3) Fallback: conversa livre com a IA
         self._reply_conversation(text)

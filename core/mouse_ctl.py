@@ -5,6 +5,10 @@ from ctypes import wintypes
 
 from pynput.mouse import Button, Controller
 
+from core.log import get_logger
+
+log = get_logger("mouse_ctl")
+
 # ── Win32 SendInput (botões do rato) ─────────────────────────────────
 # O despacho de cliques via SendInput é determinístico e sub-ms, sem o
 # overhead do pynput. Em plataformas sem user32 o código cai no pynput.
@@ -98,8 +102,8 @@ class MouseCtl:
         if not made:
             try:
                 ctypes.windll.user32.SetProcessDPIAware()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao setar DPI awareness: %s", e)
 
     @staticmethod
     def _screen_size():
@@ -115,8 +119,8 @@ class MouseCtl:
             h = int(user32.GetSystemMetrics(79))  # SM_CYVIRTUALSCREEN
             if w > 0 and h > 0:
                 return (w, h)
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("Sem monitor virtual, a usar prim\u00e1rio: %s", e)
         try:
             user32 = ctypes.windll.user32
             return (
@@ -138,8 +142,8 @@ class MouseCtl:
         else:
             try:
                 self.mouse.release(Button.left)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao libertar botao via pynput: %s", e)
 
     def move_by(self, dx, dy):
         self._frac_x += dx

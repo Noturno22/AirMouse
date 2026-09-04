@@ -6,6 +6,10 @@ para não travar o arranque quando não há teclas a enviar.
 """
 import time
 
+from core.log import get_logger
+
+log = get_logger("hotkeys")
+
 VOLUME_STEP_PX = 8.0
 ALT_HOLD_TIMEOUT_S = 1.3
 
@@ -23,8 +27,8 @@ def _media_tap(key, times=1):
         for _ in range(max(1, min(times, 8))):
             _kb_ctl.press(key)
             _kb_ctl.release(key)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Falha ao emitir tecla de m\u00eddia %s: %s", key, e)
 
 
 def _keyboard_shortcut(combo):
@@ -64,8 +68,8 @@ def _keyboard_shortcut(combo):
             time.sleep(0.03)
         for k in reversed(mod_keys):
             _kb_ctl.release(k)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Falha ao emitir atalho %s: %s", combo, e)
 
 
 def _alt_ensure():
@@ -108,8 +112,8 @@ def _alt_release_all():
         _ALT, _ = _alt_ensure()
         for k in _alt_held:
             _ALT.release(k)
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Falha ao libertar Alt (hold): %s", e)
     _alt_held.clear()
 
 

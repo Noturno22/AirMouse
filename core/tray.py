@@ -3,6 +3,10 @@ import threading
 import pystray
 from PIL import Image, ImageDraw
 
+from core.log import get_logger
+
+log = get_logger("tray")
+
 
 def _build_icon_image(active=True):
     size = 64
@@ -70,15 +74,15 @@ class TrayIcon:
         if self.icon is not None:
             try:
                 self.icon.notify(message, title)
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha na notifica\u00e7\u00e3o da bandeja: %s", e)
 
     def stop(self):
         if self.icon is not None:
             try:
                 self.icon.stop()
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug("Falha ao parar a bandeja: %s", e)
             self.icon = None
 
 
