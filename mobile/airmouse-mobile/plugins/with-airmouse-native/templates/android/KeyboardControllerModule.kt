@@ -101,15 +101,7 @@ class KeyboardControllerModule(reactContext: ReactApplicationContext) :
     fun toggleKeyboard() {
         try {
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            // Abre o teclado no campo focado via ação de acessibilidade.
-            val node = focusedEditable()
-            if (node != null) {
-                try {
-                    val shown = node.performAction(AccessibilityNodeInfo.ACTION_SHOW_INPUT_METHOD)
-                    if (shown) return
-                } catch (_: Exception) {
-                }
-            }
+            focusedEditable()?.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
             imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0)
         } catch (_: Exception) {
         }
