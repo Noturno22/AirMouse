@@ -5,6 +5,8 @@ pitch de \"nova experiência tecnológica\", grelha de benefícios
 revolucionários, planos selecionáveis, CTA dourado a pulsar e ativação
 offline de chave Pro.
 """
+import math
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
@@ -177,6 +179,11 @@ class LicenseDialog(QDialog):
         b_title = QLabel(tr("license.free_badge"))
         b_title.setObjectName("FreeSub")
         b_lay.addWidget(b_title)
+        remaining = self._lm.trial_remaining_seconds()
+        if remaining > 0:
+            rem = QLabel(tr("license.trial_remaining").format(m=max(1, math.ceil(remaining / 60))))
+            rem.setObjectName("FreeSub")
+            b_lay.addWidget(rem)
         b_lay.addStretch()
         lay.addWidget(banner)
         self._banner_pulse = breathe_glow(

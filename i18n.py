@@ -36,8 +36,8 @@ _STRINGS = {
     "btn.quit": {"pt": "SAIR", "en": "QUIT"},
     "btn.upgrade": {"pt": "UPGRADE PRO", "en": "UPGRADE PRO"},
     "btn.pro_active": {"pt": "PRO ATIVO", "en": "PRO ACTIVE"},
-    "license.free_badge": {"pt": "MODO FREE — TESTE SEMPRE", "en": "FREE MODE — ALWAYS TRIAL"},
-    "license.free_sub": {"pt": "Está no modo de teste: gratuito, sem data de fim.", "en": "You are in trial mode: free, with no expiry date."},  # noqa: E501
+    "license.free_badge": {"pt": "MODO FREE — 30 MIN DE TESTE", "en": "FREE MODE — 30 MIN TRIAL"},
+    "license.free_sub": {"pt": "Estás em teste gratuito: 30 minutos de uso. Quando esgota, o Mãouse bloqueia até ativares o Pro.", "en": "You're on a free trial: 30 minutes of use. When it runs out, Mãouse locks until you activate Pro."},  # noqa: E501
     "license.hero": {"pt": "Uma nova experiência tecnológica", "en": "A brand-new tech experience"},
     "license.hero_sub": {"pt": "Tudo o que já usa ficou mágico. Desbloqueie todo o poder do Mãouse.", "en": "Everything you use just got magical. Unlock the full power of Mãouse."},  # noqa: E501
     "license.unlocks_title": {"pt": "O QUE DESBLOQUEIA — EXPERIÊNCIA REVOLUCIONÁRIA", "en": "WHAT YOU UNLOCK — REVOLUTIONARY EXPERIENCE"},  # noqa: E501
