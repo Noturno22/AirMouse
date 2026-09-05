@@ -16,6 +16,7 @@ export interface EntitleParams {
 
 export function licenseServerUrl(): string {
   return (
+    process.env.EXPO_PUBLIC_LICENSE_SERVER_URL ||
     (Constants.expoConfig?.extra?.licenseServerUrl as string) ||
     'https://license.maouse.app'
   );

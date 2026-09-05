@@ -19,7 +19,10 @@ def _private_key_path() -> str:
 
 
 def _load_private_key():
+    """Aceita AIRMOUSE_LS_PRIVATE_KEY como caminho OU conteúdo PEM (Render)."""
     p = _private_key_path()
+    if p.lstrip().startswith("-----BEGIN"):
+        return serialization.load_pem_private_key(p.encode(), password=None)
     with open(p, "rb") as fh:
         return serialization.load_pem_private_key(fh.read(), password=None)
 
